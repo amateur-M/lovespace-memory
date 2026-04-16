@@ -4,7 +4,7 @@
 
 1. 后端采用 Spring Boot 多模块 Maven；当前以 `lovespace-user` 为可启动服务
 2. 公共能力在 `lovespace-common`（如 `ApiResponse`）
-3. **`lovespace-ai` 模块**：承载 LLM 抽象（`LLMProvider`）、通义千问（`QwenProvider`，阿里云 DashScope Java SDK）、OpenAI（Spring AI `OpenAiChatModel` + `ChatClient`）、`AiChatService` 与 `POST /api/v1/ai/chat`。父 POM 引入 `spring-ai-bom`（与 Spring Boot 3.4.x 对齐）；官方 `spring-ai-bom` 不含 DashScope，通义侧不引入 `spring-ai-alibaba` 以免与 Boot 版本冲突
+3. **`lovespace-ai` 模块**：承载 LLM 抽象（`LLMProvider`）、通义千问（`QwenProvider`，阿里云 DashScope Java SDK）、OpenAI（Spring AI `OpenAiChatModel` + `ChatClient`）、`LlmRouter`、`AiChatService` 与 `POST /api/v1/ai/chat`；**`DashScopeEmbeddingModel`** 实现 Spring AI **`EmbeddingModel`**（DashScope `TextEmbedding`，默认 `text-embedding-v2`，与聊天共用 `spring.ai.dashscope.api-key`），配置 `lovespace.ai.embedding.*`；`application.yml` **排除** `OpenAiEmbeddingAutoConfiguration`，不依赖 OpenAI 官方嵌入自动配置。**`lovespace-ai-rag` 模块**（Maven Profile **`lovespace-rag`** 按需引入 `lovespace-user`）：**Milvus**（`spring-ai-starter-vector-store-milvus`）集合 `love_knowledge_base`，`MilvusClient` 封装 `MilvusVectorStore#getNativeClient()`；`RagMilvusAutoConfigurationExclusionEnvironmentPostProcessor` 在 `lovespace.ai.rag.enabled=false` 时排除 Milvus 自动配置；可选第二集合 `travel_poi_embeddings`（`MilvusSchemaService` 骨架）。**恋爱 RAG**：`LoveQAService` + `POST /api/v1/ai/love-qa/ingest|chat`（需 **`VectorStore` + `EmbeddingModel` + Redis**）。**情侣旅游规划**：`TravelPlannerService` + `POST /api/v1/ai/travel/plan`，输出 JSON（`TravelPlanJsonSchema`）。父 POM 引入 `spring-ai-bom`（与 Spring Boot 3.4.x 对齐）；官方 `spring-ai-bom` 不含 DashScope，通义侧不引入 `spring-ai-alibaba` 以免与 Boot 版本冲突
 4. **实时消息**：在 REST 持久化基础上增加原生 WebSocket（非 STOMP），会话注册表 `ChatSessionRegistry` 按 `coupleId` 订阅后广播
 
 ## 版本与构建
@@ -78,6 +78,8 @@
 1. **通用对话**：`POST /api/v1/ai/chat`，由 `AiChatService` 按 `lovespace.ai.provider` 选择 `QwenProvider` 或 `OpenAiProvider`
 2. **情感分析**：`GET /api/v1/ai/emotion`，`EmotionAnalysisService`；数据来自 `LoveRecordService.listVisibleRecordsInRange`（与时间轴一致可见性）；统计心情分布与日趋势 + 通义 JSON 解析 `overallMood`/`moodScore`/`insights`；默认区间、最长期间与业务码见 `EmotionAnalysisService` / `TimelineBusinessException`（`EmotionAnalysisController` 与时间轴共用 `TimelineControllerExceptionHandler`）
 3. **情书生成**：`POST /api/v1/ai/love-letter`，`LoveLetterService`；发送方/接收方/恋爱天数由服务端从当前用户与 `CoupleInfoResponse` 解析；`memories` 可选，缺省时用近一年可见记录摘要；风格 romantic/humorous/sincere，篇幅 short/medium/long；异常 `LoveLetterBusinessException` + `LoveLetterControllerExceptionHandler`
+4. **恋爱知识库 RAG**：`POST /api/v1/ai/love-qa/ingest`（文本入库）、`POST /api/v1/ai/love-qa/chat`（检索 + LLM + **Redis 多轮记忆** + **MySQL 每轮持久化** `love_qa_conversations` / `love_qa_messages`，脚本 `love_qa.sql`）；`GET .../love-qa/conversations`、`GET .../love-qa/conversations/{id}/messages` 供历史查看；`LoveQAController` 在 `lovespace-user`（需 JWT），仅在存在 `LoveQaChatFacade` Bean（RAG 启用且 `VectorStore` 等就绪）时注册；`LoveQAHistoryController` 不依赖 Milvus；会话键 `lovespace:love-qa:conv:{id}`，TTL 与最大轮数见 `lovespace.ai.rag.*`；向量维度与嵌入模型见 **`lovespace.ai.embedding.*`** 与 **`spring.ai.vectorstore.milvus.embedding-dimension`**（须一致）；部署需 **`SPRING_AI_DASHSCOPE_API_KEY`**（嵌入与通义聊天共用，RAG 场景下）
+5. **情侣旅游规划**：`POST /api/v1/ai/travel/plan`，`TravelPlannerService` 输出结构化 JSON；可选 `lovespace.ai.travel.poi-vector-search-enabled` 与 POI 向量骨架；高德 `AmapPlacesClient` 当前为占位实现
 
 ## 异常与响应
 
@@ -90,6 +92,8 @@
 7. 公共分片：`MediaChunkBusinessException` + `MediaChunkExceptionHandler`（限定 `MediaChunkUploadController`）
 8. 情书业务：`LoveLetterBusinessException` + `LoveLetterControllerExceptionHandler`（限定 `LoveLetterController`）
 9. 纪念日：`MemorialDayBusinessException` + `MemorialDayControllerExceptionHandler`（限定 `MemorialDayController`）；示例码 40490 未找到、40390 非成员、40091 名称为空
+10. AI 功能（旅游规划 / 通用对话）：`AiFeaturesExceptionHandler`（限定 `TravelPlannerController`、`AiChatController`）；`IllegalStateException` → HTTP 503 + code `50301`；JSON 解析失败 → HTTP 502 + code `50201`
+11. 恋爱 RAG：`LoveQAControllerExceptionHandler`（限定 `LoveQAController`）；会话不存在或过期 → HTTP 404 + code `40491`；越权或 coupleId 不一致 → HTTP 403 + code `40391`
 
 ## 纪念日 API 与缓存
 

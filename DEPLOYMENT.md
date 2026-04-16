@@ -23,6 +23,9 @@
     ├── mysql/
     ├── redis/
     ├── minio/
+    ├── milvus/
+    │   ├── etcd/
+    │   └── standalone/
     └── uploads/                   # 后端本地存储回退目录挂载
 ```
 
@@ -37,7 +40,7 @@
 在 **`lovespace-backend`** 父目录执行：
 
 ```bash
-mvn -pl lovespace-user -am package -DskipTests
+mvn -pl lovespace-user -am package -DskipTests -Plovespace-rag
 ```
 
 将 **`lovespace-user/target/lovespace-user-0.0.1-SNAPSHOT.jar`**（版本号以实际为准）复制到部署目录 **`lovespace-backend/target/`**，且**只保留一个** jar，或复制为 **`lovespace-backend/app.jar`**。
@@ -66,16 +69,18 @@ npm run build
 
 | 服务 | 说明 |
 |------|------|
+| **milvus-etcd** | Milvus 元数据存储（etcd）；数据卷 `./data/milvus/etcd`。 |
+| **milvus** | 向量库服务；端口 `19530`（gRPC）和 `9091`（HTTP）；数据卷 `./data/milvus/standalone`；对象存储**复用**下方 **minio**（与业务同一 `MINIO_ROOT_*`）。 |
 | **mysql** | 数据卷 `./data/mysql`；健康检查通过后 **`backend`** 再启动。 |
 | **redis** | 数据卷 `./data/redis`；分布式 Session 与黑名单等依赖。 |
 | **minio** | API 默认映射 **9000**，控制台 **9001**；数据卷 `./data/minio`。 |
-| **backend** | 环境变量覆盖 **`application.yml`**：如 **`SPRING_DATASOURCE_URL`** 指向 `mysql:3306`、**`LOVESPACE_MINIO_ENDPOINT`=`http://minio:9000`**，等。 |
+| **backend** | 环境变量覆盖 **`application.yml`**：如 **`SPRING_DATASOURCE_URL`** 指向 `mysql:3306`、**`MILVUS_HOST=milvus`**、**`LOVESPACE_AI_RAG_ENABLED=true`**、**`LOVESPACE_MINIO_ENDPOINT`=`http://minio:9000`**，等。 |
 | **frontend** | 反代 **`/api/`**、**`/local-files/`**、**`/ws/`** → **`backend:8081`**；**`client_max_body_size`** 与后端大文件上传对齐。 |
 
-仅启动基础依赖：
+仅启动基础依赖（含 Milvus）：
 
 ```bash
-docker compose up -d mysql redis minio
+docker compose up -d milvus-etcd minio milvus mysql redis
 ```
 
 全量启动：
@@ -86,7 +91,7 @@ docker compose up -d
 ```
 看日志：
 ```bash
-compose logs backend --tail 80
+docker compose logs backend --tail 80
 ```
 
 ---
@@ -97,16 +102,26 @@ compose logs backend --tail 80
 
 ---
 
-## 6. MinIO 与图片 403
+## 6. 恋爱问答 RAG（Milvus）专项检查
 
-### 6.1 返回给前端的 URL 形态
+1. 后端构建必须带 Profile：`-Plovespace-rag`（否则产物不含 `lovespace-ai-rag`）。
+2. `LOVESPACE_AI_RAG_ENABLED=true`，并保证 **`SPRING_AI_DASHSCOPE_API_KEY`** 有效（聊天与 **DashScope 文本嵌入**共用；Milvus 需要 `EmbeddingModel`）。
+3. Compose 内后端使用 `MILVUS_HOST=milvus`、`MILVUS_PORT=19530` 连接向量库；Milvus 与业务共用 **minio**（无需第二个 MinIO 容器）。
+4. 首次启动后先调用 `/api/v1/ai/love-qa/ingest` 再调用 `/api/v1/ai/love-qa/chat` 验证链路。
+5. 若 `chat`/`ingest` 路由缺失，优先检查是否漏了 `-Plovespace-rag` 或 `LOVESPACE_AI_RAG_ENABLED` 未生效。
+
+---
+
+## 7. MinIO 与图片 403
+
+### 7.1 返回给前端的 URL 形态
 
 **`MinioAvatarStorageService.buildUrl`**（`lovespace.minio`）：
 
 - 若配置了 **`lovespace.minio.public-base-url`**，返回 **`{publicBaseUrl}/{bucket}/{objectKey}`**（**`publicBaseUrl` 末尾不要带桶名**，避免重复；代码已含 **`bucket`** 段）。
 - 未配置时，使用 **`http://{strip(endpoint)}/{bucket}/{objectKey}`**（**`endpoint` 为 `http://minio:9000` 时浏览器无法解析主机名 `minio`**，生产应配置 **`LOVESPACE_MINIO_PUBLIC_BASE_URL`** 为浏览器可访问地址，如 **`http://公网IP:9000`** 或域名）。
 
-### 6.2 浏览器 403 Forbidden
+### 7.2 浏览器 403 Forbidden
 
 直链 **`http://IP:9000/bucket/object`** 时，匿名 **GET** 需桶策略允许读；默认桶为**私有**，会 **403**。处理：
 
@@ -117,18 +132,20 @@ compose logs backend --tail 80
 
 ---
 
-## 7. 故障排查简表
+## 8. 故障排查简表
 
 | 现象 | 可能原因 |
 |------|----------|
 | 后端 **`no main manifest attribute`** | 非 `lovespace-user` fat jar 或未 **`repackage`**。 |
 | Compose 插值报错 | 使用 **`${VAR:-default}`** 语法。 |
+| 恋爱问答接口 404 | 未使用 `-Plovespace-rag` 构建，或 `LOVESPACE_AI_RAG_ENABLED=false`。 |
+| Milvus 连接失败 | 检查 `milvus` 服务状态、`MILVUS_HOST/MILVUS_PORT` 与端口映射。 |
 | 图片 403 | 桶未开放匿名读；或 URL 缺少 **`/{bucket}/`** 段导致路径错误。 |
 | 图片无法加载（内网 `minio` 主机名） | 配置 **`LOVESPACE_MINIO_PUBLIC_BASE_URL`** 为公网可访问 MinIO 基址。 |
 
 ---
 
-## 8. 相关代码与配置
+## 9. 相关代码与配置
 
 - 后端存储：**`MinioAvatarStorageService`**、**`MinioProperties`**（`lovespace.minio.*`）。
 - 前端媒体 URL：**`utils/mediaUrl.ts`**（`resolveMediaUrl`）。

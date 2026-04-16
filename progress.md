@@ -5,7 +5,7 @@
 - **核心功能已落地**：用户认证、个人资料（含头像上传）、情侣绑定、恋爱时间轴（含图片与视频 URL、区间筛选、作者编辑/删除、分页、可见性表单；直传或小文件 multipart，大文件公共分片；点赞与评论互动）、情侣相册（含相册内照片分页；大图分片 + from-url 登记；相册改名、照片元数据编辑）、私密消息（REST + WebSocket + 定时）、共同计划（计划 + 子任务 CRUD、计划消费流水 CRUD、预算按消费汇总、进度同步）均已落地并可联调
 - **账号与登录（手机号）**：登录/注册使用 **中国大陆 11 位手机号**（`PhoneNormalizer` + `^1[3-9]\d{9}$`）；**邮箱**不在注册环节收集，在 **`PUT /api/v1/user/profile`** 中可选填或清空；**用户名**展示名可在资料页修改（唯一性校验）。**情侣邀请**：`POST /api/v1/couple/invite` body 为 **`inviteePhone`**（按手机号查找用户，不再使用 `inviteeUserId`）。JWT 含 `phone` claim（`JwtUtil.CLAIM_PHONE`）；`getPhone(claims)` 可回退读旧 token 的 `email` claim 以兼容过渡期。存量库执行 `sql/users_add_phone_account.sql`；新库用 `users.sql`（含 `phone` UNIQUE、`email` 可空）
 - **纪念日倒计时**：后端 `/api/v1/memorial-days`（CRUD、`/next` 最近倒计时、`/upcoming` 近期窗口）、表 `memorial_days`、Redis 缓存 `lovespace:memorial:next:{coupleId}` / `upcoming:{coupleId}`、配置 `lovespace.memorial.*`、定时 `MemorialDayCacheRefreshTask`；`MemorialCountdownCalculator` 用 `MonthDay` 做每年循环与剩余毫秒。前端：`Memorial.tsx` + `memorialStore` + `services/memorial.ts`；路由 `/memorial` 已在 `App.tsx` 注册，顶栏有「纪念日」入口。页面为简约浪漫 + 手绘感（玫瑰主色一致）：`MemorialRomanticDecor`（SVG 爱心/星光）、`MemorialPhotoWall`（从相册拉取照片、双环错落环绕布局、中心柔光；无照片时占位相框）；**恋爱倒计时与祝福语区块在照片墙上方**；照片用 Ant Design **`Image` + `preview`**（列表用缩略图、预览优先原图 `imageUrl`）；**新建**主要靠右下角 FloatButton，折叠面板「全部纪念日」仅列表编辑/删除（**页内已移除月历与标题区新建按钮**）；内容区 **`w-full`** 与 `AppLayout` 的 `max-w-6xl` 对齐。字体：`index.html` 引入 Caveat、马善政；`index.css` 含 `memorial-display` / `memorial-accent` / `memorial-polaroid` 与星光动画（`prefers-reduced-motion` 下减弱）
-- **AI 能力**（`lovespace-ai` + `lovespace-user`）：Spring AI 1.0（`spring-ai-openai`）+ 通义千问（阿里云 DashScope Java SDK）；`LLMProvider`（`QwenProvider` / `OpenAiProvider`）与 `lovespace.ai.provider` 路由；`POST /api/v1/ai/chat` 通用对话；情感分析（`EmotionAnalysisService` + `GET /api/v1/ai/emotion`，统计 + 通义解读）；情书生成（`LoveLetterService` + `POST /api/v1/ai/love-letter`）。父工程 Spring Boot 3.4.x + `spring-ai-bom` 以配套 Spring AI
+- **AI 能力**（`lovespace-ai` + `lovespace-user`）：Spring AI 1.0（`spring-ai-starter-model-openai`，聊天可选 OpenAI）+ 通义千问（阿里云 DashScope Java SDK）；`LLMProvider`（`QwenProvider` / `OpenAiProvider`）、`LlmRouter` 与 `lovespace.ai.provider` 路由；`POST /api/v1/ai/chat` 通用对话；情感分析（`EmotionAnalysisService` + `GET /api/v1/ai/emotion`）；情书生成（`LoveLetterService` + `POST /api/v1/ai/love-letter`）；**Milvus 向量库**（`lovespace-ai-rag` + `spring-ai-starter-vector-store-milvus`）+ 恋爱 RAG（`LoveQAService`，`POST /api/v1/ai/love-qa/ingest`、`/chat`）：需 **`mvn -Plovespace-rag`**、**Milvus**、**`EmbeddingModel`**；嵌入默认 **`DashScopeEmbeddingModel`**（`text-embedding-v2` 等），与聊天**共用** `spring.ai.dashscope.api-key`，配置见 `lovespace.ai.embedding.*`（**排除** `OpenAiEmbeddingAutoConfiguration`，不依赖 OpenAI 嵌入）；**情侣旅游规划**（`TravelPlannerService`，`POST /api/v1/ai/travel/plan`，JSON 输出）。`application.yml` 含 `spring.ai.vectorstore.milvus.*`、`lovespace.ai.rag.*`、`lovespace.milvus.*`。父工程 Spring Boot 3.4.x + `spring-ai-bom` 以配套 Spring AI
 - 接口前缀统一 `/api/v1`；Vite 开发代理 `/api`、`/local-files` → 后端 8081
 - 父 POM 已启用 `maven-compiler-plugin parameters=true`，且 Controller 中关键 `@RequestParam`/`@PathVariable` 已写显式名称，避免 Spring 绑定报错
 - 前端已统一暖色主题（玫瑰主色 + 浅粉背景，Inter 字体），相册照片列表为等尺寸网格（aspect-square + object-cover）
@@ -19,7 +19,7 @@
 - **前端全局样式**：@ant-design/cssinjs StyleProvider hashPriority="high"（与 Tailwind 共存）；index.css 将 prefers-reduced-motion 限定在 #root *，避免破坏挂到 body 的 Ant Design 浮层；ConfigProvider getPopupContainer={() => document.body}；主题 zIndexPopupBase: 1050
 - **页面体验**：情侣首页 Hero、快捷入口、解除关系弱化；AI 情书去掉与按钮重复的 Alert；AppLayout flex 布局 + Footer mt-auto 使页脚贴视口底（内容短时）
 - **情侣邀请与「消息」**：GET/POST /api/v1/couple/pending-invites、GET .../pending-invites/count；被邀请方在 /inbox 列表一键接受，无需手输绑定码；AppLayout 下拉消息列表 + inboxStore 角标；CoupleHome 以「查看消息」为主流程
-- **容器部署**：根目录 docker-compose.yml（MySQL / Redis / MinIO / backend / frontend）、双 Dockerfile、env.example、前端 nginx.conf 反代 /api、/local-files、/ws；说明见 DEPLOYMENT.md
+- **容器部署**：根目录 docker-compose.yml（**milvus-etcd**、**milvus**、MySQL / Redis、与 Milvus **共用**业务 **MinIO**、backend / frontend）、双 Dockerfile、env.example、前端 nginx.conf 反代 /api、/local-files、/ws；RAG 相关环境变量见 `env.example`（如 `LOVESPACE_AI_RAG_ENABLED`、`SPRING_AI_DASHSCOPE_API_KEY`）；说明见 DEPLOYMENT.md
 - **Maven 可执行包**：父 POM pluginManagement 为 spring-boot-maven-plugin 指定 ${spring-boot.version}；lovespace-user 显式 repackage 与 mainClass，避免 fat jar 无 Main-Class
 - **MinIO 访问 URL**：lovespace.minio.public-base-url 若配置，MinioAvatarStorageService 返回 {publicBaseUrl}/{bucket}/{objectKey}；未配置时用 http://{endpoint主机}/{bucket}/{objectKey}，生产应对外填写 LOVESPACE_MINIO_PUBLIC_BASE_URL；浏览器直链对象需桶匿名读策略，否则 403
 
@@ -32,7 +32,7 @@
 | 模块 | 说明 |
 |------|------|
 | `lovespace-common` | 统一响应 ApiResponse 等 |
-| **`lovespace-ai`** | LLM 抽象（LLMProvider）、QwenProvider（DashScope）、OpenAiProvider（Spring AI OpenAiChatModel）、AiChatService、AiChatController（POST /api/v1/ai/chat） |
+| **`lovespace-ai`** | LLM 抽象（LLMProvider）、LlmRouter、QwenProvider（DashScope）、OpenAiProvider（Spring AI OpenAiChatModel）、**`DashScopeEmbeddingModel`**（`EmbeddingModel`，供 RAG）、AiChatService、Milvus 集成（`MilvusClient`、`MilvusSchemaService`）、恋爱 RAG 实现在 **`lovespace-ai-rag`**（`LoveQAService`；`LoveQAController` 在 user）、旅游规划（`TravelPlannerService`、`TravelPlannerController`）、AiChatController（POST /api/v1/ai/chat） |
 | `lovespace-user` | 可运行用户服务（端口默认 8081）；依赖 lovespace-ai；扫描 com.meng.lovespace.ai 与 AI 相关 @ConfigurationPropertiesScan |
 
 ### 数据表脚本（`lovespace-user/src/main/resources/sql/`）
@@ -47,6 +47,7 @@
 - couple_plans.sql — couple_plans、plan_tasks（共同计划与子任务；plan_tasks.plan_id 外键级联删除）
 - plan_expenses.sql — plan_expenses（计划消费：expense_type 为 lodging|transport|dining|other；plan_id 外键级联删除）
 - memorial_days.sql — memorial_days（纪念日：couple_id、user_id、name、memorial_date 等）
+- love_qa.sql — love_qa_conversations、love_qa_messages（恋爱问答会话与消息持久化）
 
 ### 主要 API 分组
 
@@ -83,6 +84,11 @@
   - POST /ai/chat — body AiChatRequest（message），返回 AiChatResponseData（reply）；路由 lovespace.ai.provider：qwen | openai。
   - GET /ai/emotion?coupleId&startDate&endDate — EmotionAnalysisController；EmotionAnalysisReport：overallMood、moodScore、emotionDistribution、trendData、insights；统计来自 LoveRecordService.listVisibleRecordsInRange + 通义 JSON 解析；区间默认近 30 天、最长 366 天；TimelineControllerExceptionHandler 已包含 EmotionAnalysisController。
   - POST /ai/love-letter — body LoveLetterGenerateRequest（coupleId、style、length、memories 可选）；LoveLetterService 填充发送方/接收方/恋爱天数，回忆可选手写或由近 1 年记录摘要；LoveLetterControllerExceptionHandler。
+  - POST /ai/love-qa/ingest — LoveQaIngestRequest（text、title、metadata 可选）；`LoveQAService.ingestDocument`；仅当存在 Spring AI `VectorStore`（Milvus + `EmbeddingModel`）时注册 `LoveQAController`。
+  - POST /ai/love-qa/chat — LoveQaChatRequest（message、可选 conversationId、coupleId）；Redis 多轮会话记忆（`lovespace:love-qa:conv:*`），响应含 `conversationId`；每轮成功后 **MySQL 持久化**（`LoveQaConversationService.appendChatRound`：love_qa_conversations / love_qa_messages）；检索 Milvus 后 RAG；长耗时建议前端 timeout ≥120s（与情感/情书一致）。
+  - GET /ai/love-qa/conversations?page&pageSize — `LoveQAHistoryController`：当前用户会话列表（摘要标题、更新时间）。
+  - GET /ai/love-qa/conversations/{conversationId}/messages — 该会话下全部消息（按 id 升序）；业务码 40492 不存在、40392 非本人会话。
+  - POST /ai/travel/plan — TravelPlanRequest（destination、days、budgetMin/Max、preferences、transportMode）；返回 `TravelPlanJsonSchema`；`AiFeaturesExceptionHandler` 处理 LLM 不可用 / JSON 非法。
 - **时间轴扩展**：LoveRecordService.listVisibleRecordsInRange — 情侣成员下、日期区间内可见记录全量列表（不分页），供情感分析等使用。
 - **实现注意**：listPlans 内对任务列表排序前使用 new ArrayList<>(getOrDefault(..., List.of()))，避免对不可变空列表 sort 抛异常。
 
@@ -232,3 +238,11 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 **前端**：`Login`/`Register` 表单为手机号；`Profile` 展示只读手机号、可编辑用户名与邮箱（`updateProfile`）；`HomePage` 展示手机号与邮箱；`couple.ts` 与 `CoupleHome` 邀请走 `inviteePhone`。
 
 **个人资料页小调**：头像上传后 `Avatar` 以 `user.avatarUrl` 为准；`avatarUrl` 与 store 同步逻辑见当前 `Profile.tsx`（用户可继续迭代）。
+
+### 恋爱问答 RAG、Milvus 与通义嵌入（接续）
+
+**部署**：`docker-compose.yml` 增加 **milvus-etcd**、**milvus**，对象存储与业务 **共用同一 MinIO**；`backend` 注入 `LOVESPACE_AI_RAG_ENABLED`、`MILVUS_HOST`、`SPRING_AI_DASHSCOPE_API_KEY` 等；`env.example`、`memory/DEPLOYMENT.md` 已同步。
+
+**嵌入**：`lovespace-ai` 新增 **`DashScopeEmbeddingModel`** + **`DashScopeEmbeddingConfiguration`**（`lovespace.ai.rag.enabled=true` 时注册），与 **`QwenProvider`** 共用 **`spring.ai.dashscope.api-key`**；`lovespace.ai.embedding.*` 与 Milvus **`embedding-dimension`** 对齐；**排除** `OpenAiEmbeddingAutoConfiguration`。
+
+**文档**：`memory/love-qa-rag.md`、`decisions.md`、`progress.md`、`PROJECT_STRUCTURE.md`、`INDEX.md`、`blockers.md` 已按上述约定更新摘要。

@@ -12,7 +12,7 @@
 
 ## 已知注意事项（非阻塞）
 
-1. **配置与密钥**：`application.yml` 中 JWT secret、数据库密码等应为本地/环境自有配置，勿提交敏感信息到公共仓库。AI 功能（对话、情感分析、情书）依赖 `spring.ai.dashscope.api-key`（通义千问）；未配置时相关接口将失败或回退为纯统计/错误提示
+1. **配置与密钥**：`application.yml` 中 JWT secret、数据库密码等应为本地/环境自有配置，勿提交敏感信息到公共仓库。AI 功能（对话、情感分析、情书）依赖 `spring.ai.dashscope.api-key`（通义千问）；未配置时相关接口将失败或回退为纯统计/错误提示。**恋爱问答 RAG**（`lovespace.ai.rag.enabled=true` 且 **`mvn -Plovespace-rag`**）另需 **Milvus** 可达、`lovespace.ai.embedding.*` 与 **`spring.ai.vectorstore.milvus.*`** 一致；Compose 见根目录 `docker-compose.yml`（**milvus-etcd**、**milvus**、共用 **minio**）。嵌入与聊天共用 **`SPRING_AI_DASHSCOPE_API_KEY`**，一般不再需要仅为 RAG 配置 OpenAI Key
 2. **前端构建**：Vite 可能对主 chunk 体积告警，不影响功能
 3. **邀请流程**：已实现 `/inbox` 与 `pending-invites` API，被邀请方在消息页接受；若仍手调 API，需 `bindingId` 调用 `POST /couple/accept`
 4. **时间轴媒体与静态访问**：直传依赖 `POST /api/v1/timeline/upload`；本机访问依赖 `LocalFileRangeController` 的 `GET /local-files/**`（含 Range）。生产需配置正确的 `public-base-url` 或 OSS；反向代理需正确转发 Range/If-Range，避免破坏视频分段缓冲
