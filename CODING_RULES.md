@@ -9,7 +9,7 @@
 - **分层**：controller（参数校验+编排）→ service/impl（业务）→ entity+mapper（持久化）；入参出参用 dto/record
 - **命名**：类大驼峰、方法字段小驼峰、常量全大写下划线；数据库列 snake_case，实体用 `@TableField` 映射
 - **格式**：4空格缩进；优先使用 Lombok `@Data`；Spring MVC 路径变量与 `@RequestParam` 写显式名称（如 `@RequestParam("coupleId")`）
-- **响应**：对外 JSON 用 `ApiResponse`；业务错误用领域异常 + 对应 `*ControllerExceptionHandler`
+- **响应**：对外 JSON 用 `ApiResponse`；业务错误用领域异常（继承 `lovespace-common` 的 `ApiBusinessException`），由 `UserGlobalExceptionHandler` 等 `@RestControllerAdvice` 统一转换
 
 ### 前端（TypeScript / React）
 - **栈**：React 18 函数组件 + Hooks；类型明确避免滥用 `any`；路由与布局分离

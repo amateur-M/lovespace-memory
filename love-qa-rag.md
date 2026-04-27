@@ -1,142 +1,100 @@
-# 恋爱知识库（Love QA）与可选 RAG 说明
+# 恋爱知识库（Love QA）与 RAG / Milvus
 
-本文汇总「AI 恋爱问答 / RAG / Milvus」相关的前后端设计、实现要点、如何开启 RAG，以及部署与配置注意点。
+本文汇总「AI 恋爱问答 / RAG / Milvus」的前后端设计、Bean 装配、集合初始化与部署要点（与当前代码一致）。
 
 ---
 
 ## 1. 目标与分层
 
-- **lovespace-ai**：LLM 抽象（通义千问 / OpenAI）、通用 DTO、`LoveQaChatFacade` 接口与恋爱问答相关异常；**不**默认携带 Milvus 与 Redis（RAG 专用）依赖。
-- **lovespace-ai-rag**（可选模块）：Milvus 向量库、Spring AI `VectorStore`、Redis 多轮会话、`LoveQAService` 对 `LoveQaChatFacade` 的实现，以及在未启用 RAG 时排除 Milvus 自动配置的 `EnvironmentPostProcessor`。
-- **lovespace-user**：`LoveQAController`（入库 / 聊天，仅在存在 `LoveQaChatFacade` Bean 时注册）、`LoveQAHistoryController` 与 MySQL 持久化（会话与消息列表）、安全与 OpenAPI。
+- **`lovespace-ai`**：LLM 抽象（通义千问 / OpenAI）、`LoveQaChatFacade` 与 DTO/异常；**`DashScopeEmbeddingConfiguration`** 在 `lovespace.ai.embedding.provider=dashscope`（默认）且无其它 `EmbeddingModel` Bean 时注册 **`DashScopeEmbeddingModel`**，与聊天共用 **`spring.ai.dashscope.api-key`**。同模块还包含 Spring AI **`VectorStore`（Milvus）**、`LoveQAService`（实现 `LoveQaChatFacade`）、Redis 多轮会话、`MilvusSchemaService`、`RagMilvusConfiguration` 等 RAG 实现。
+- **`lovespace-user`**：**`LoveQAController`** 为 **`@RestController`**，由 **`com.meng.lovespace.user`** 包扫描注册（不再使用单独的 `LoveQAControllerConfiguration`）；**`LoveQAHistoryController`** 提供 MySQL 历史分页。
 
 ---
 
-## 2. 后端设计要点
-
-### 2.1 模块与依赖
+## 2. 模块与 Maven
 
 | 模块 | 作用 |
 |------|------|
-| `lovespace-ai` | `LLMProvider`、`LlmRouter`、`LovespaceAiProperties`（provider + travel）、`LoveQaChatFacade`、`LoveQaChatParams`/`LoveQaChatResult`、`LoveQaConversation*Exception` |
-| `lovespace-ai-rag` | `spring-ai-starter-vector-store-milvus`、`spring-boot-starter-data-redis`、RAG 与 Milvus 骨架实现 |
-| `lovespace-user` | Web、JWT、MyBatis、`LoveQAController` 等；**默认 POM 不依赖** `lovespace-ai-rag` |
+| `lovespace-ai` | `LLMProvider`、`LlmRouter`、`LoveQaChatFacade`、嵌入、旅游规划；以及 `spring-ai-starter-vector-store-milvus`、`LoveQAService`、`DocumentIngestPipeline`、`MilvusSchemaService`、`RagMilvusConfiguration` 等 RAG |
+| `lovespace-user` | 默认可执行 JAR **依赖** `lovespace-ai`（含 RAG）；**无需** Maven Profile `-Plovespace-rag` |
 
-`lovespace-user` 通过 Maven **Profile `lovespace-rag`** 按需引入 `lovespace-ai-rag`（见 `lovespace-user/pom.xml`）。默认打包产物**不包含** Milvus 相关 JAR，满足「无 Milvus 环境不拉向量库依赖」的诉求。
-
-### 2.2 配置开关
-
-- **`lovespace.ai.rag.enabled`**（默认 `false`）：业务上是否启用 RAG；为 `true` 时不应再排除 Milvus 自动配置（见下条）。
-- **`lovespace.ai.rag.*`**：分片、`retrieveTopK`、Redis 会话 TTL、`max-history-pairs` 等（由 `lovespace-ai-rag` 内 `RagAiProperties` 绑定）。
-- **`lovespace.milvus.*`**：扩展集合名、`ensure-travel-poi-schema` 等（旅游 POI 骨架）。
-- **`spring.ai.vectorstore.milvus.*`**：Milvus 客户端、集合名、`embedding-dimension` 等（与 Spring AI 文档一致）。
-
-`lovespace-ai-rag` 中的 **`RagMilvusAutoConfigurationExclusionEnvironmentPostProcessor`**：当 **`lovespace.ai.rag.enabled` 不为 true** 时，向 `spring.autoconfigure.exclude` 追加  
-`org.springframework.ai.autoconfigure.vectorstore.milvus.MilvusVectorStoreAutoConfiguration`，避免未部署 Milvus 时仍初始化向量客户端。
-
-### 2.3 Bean 装配关系（概念）
-
-- `LoveQAController`：`@ConditionalOnBean(LoveQaChatFacade.class)`，仅当 RAG 模块在 classpath 且满足条件时出现实现类时注册。
-- `LoveQAService`：`implements LoveQaChatFacade`，`@ConditionalOnProperty(lovespace.ai.rag.enabled=true)` 且 `@ConditionalOnBean(VectorStore.class)`。
-- 多轮短期记忆：Redis（键前缀 `lovespace:love-qa:conv:`）；MySQL 侧由 `LoveQaConversationService` 做持久化与历史列表（与 RAG 是否启用独立，历史接口仍可用）。
-
-### 2.4 API 约定（用户服务）
-
-- `POST /api/v1/ai/love-qa/ingest`：知识库入库（需 RAG 开启且认证通过）。
-- `POST /api/v1/ai/love-qa/chat`：多轮问答（长耗时，前端 `http` 建议 timeout ≥ 120s，与项目规范一致）。
-- `GET /api/v1/ai/love-qa/conversations`、  
-  `GET /api/v1/ai/love-qa/conversations/{id}/messages`：历史分页与消息（MySQL）。
-
----
-
-## 3. 前端设计要点
-
-- **路由**：`/love-qa`，入口在主导航（如 `AppLayout`）。
-- **页面**：`lovespace-frontend/src/pages/AILoveQA.tsx`，调用 `services/loveQa.ts`。
-- **请求路径**：与后端 `/api/v1/ai/love-qa/*` 对齐；聊天、入库使用 POST，历史使用 GET。
-- **体验**：未启用后端 RAG 时，聊天/入库接口可能 404 或无对应 Bean；产品侧可后续加「能力探测」或文案提示（当前以服务端是否注册 Controller 为准）。
-
----
-
-## 4. 如何开启并使用 RAG
-
-### 4.1 构建：引入 RAG 模块
-
-在项目根或 `lovespace-backend` 下执行（示例）：
+打包示例：
 
 ```bash
-mvn -pl lovespace-user -am package -Plovespace-rag
+mvn -pl lovespace-user -am package -DskipTests
 ```
-
-日常不启用 RAG 时，可省略 `-Plovespace-rag`，产物不含 `lovespace-ai-rag`。
-
-### 4.2 配置：打开业务开关
-
-在 `application.yml`（或环境变量覆盖）中设置：
-
-```yaml
-lovespace:
-  ai:
-    rag:
-      enabled: true
-```
-
-并配置：
-
-- **Milvus**：`spring.ai.vectorstore.milvus.client.host` / `port` 等，以及集合、`embedding-dimension` 与索引参数。
-- **嵌入模型**：Milvus 依赖 **`EmbeddingModel`**。默认由 **`spring.ai.dashscope.api-key`** 驱动通义 **text-embedding**（`lovespace.ai.embedding.model`）；若改用 OpenAI 嵌入则配置 `spring.ai.openai.api-key` 并见下文「注意点」。
-- **Redis**：多轮会话需要可用的 `StringRedisTemplate`（与现有 `spring.data.redis` 一致）。
-- **LLM**：`lovespace.ai.provider` 与 `spring.ai.dashscope` / `spring.ai.openai` 等与现有 AI 模块一致。
-
-### 4.3 运行与验证
-
-- 启动 Milvus、Redis、MySQL；设置上述配置后启动 `lovespace-user`。
-- Swagger：`/swagger-ui.html` 中应出现恋爱知识库相关接口（在 Controller 已注册的前提下）。
-- 先调用 **ingest** 写入片段，再 **chat** 验证检索与多轮。
 
 ---
 
-## 5. 注意点
+## 3. 配置要点
 
-### 5.1 嵌入模型与 RAG（默认通义 DashScope）
-
-当前默认使用 **通义 DashScope 文本向量**（`lovespace.ai.embedding.*`，实现为 `DashScopeEmbeddingModel`），与聊天共用 **`spring.ai.dashscope.api-key`**；`spring.autoconfigure.exclude` 中包含 **`OpenAiEmbeddingAutoConfiguration`**，避免拉 OpenAI 嵌入。
-
-若改用 **OpenAI 嵌入**：去掉对 `OpenAiEmbeddingAutoConfiguration` 的排除，配置 `spring.ai.openai.api-key`，并设置 `lovespace.ai.embedding.provider=openai`（且勿再注册 DashScope 的 `EmbeddingModel` Bean）。
-
-若既不启用 OpenAI 嵌入自动配置、也未提供可用的 **`EmbeddingModel` Bean**，Milvus 向量存储无法在启动阶段正确装配。
-
-### 5.2 `lovespace.ai.rag.enabled` 与 EPP
-
-- `enabled=false`（默认）时，即使已加入 `lovespace-ai-rag` JAR，也会通过 EPP 排除 Milvus 自动配置，**不会**创建 `VectorStore`，`LoveQaChatFacade` 实现不会出现，`LoveQAController` 不注册。
-- `enabled=true` 时必须保证 Milvus 与嵌入链路可用，否则可能在启动或首次向量操作时失败。
-
-### 5.3 默认不打包 RAG
-
-未使用 `-Plovespace-rag` 时，Fat JAR 中**没有** Milvus 相关依赖，适合无向量库的运行环境；需要 RAG 的部署流水线应固定带上该 Profile 或等价依赖声明。
-
-### 5.4 安全与敏感信息
-
-- 不在日志中打印完整 API Key、Token；长连接与超时策略与 `lovespace-coding-standards` 及 `http.ts` 约定一致。
-
-### 5.5 数据双轨
-
-- **Redis**：短期多轮上下文（TTL 由 `lovespace.ai.rag.conversation-ttl-seconds` 控制）。
-- **MySQL**：会话与消息持久化、历史列表；与 RAG 开关解耦，便于未开 RAG 时仍查看历史（若库表已迁移）。
+- **`lovespace.ai.rag.*`**：`RagAiProperties` — 分片、`retrieve-top-k`、Redis 会话 TTL、`max-history-pairs` 等（**已无**业务总开关 `enabled`）。
+- **`spring.ai.vectorstore.milvus.*`**：客户端、**`collection-name`**、**`database-name`**、**`embedding-dimension`**、**`initialize-schema`**、索引类型/度量等（与 [Spring AI Milvus 文档](https://docs.spring.io/spring-ai/reference/api/vectordbs/milvus.html) 一致）。
+- **`lovespace.milvus.*`**：`MilvusProperties` — **`ensure-love-knowledge-schema`**（默认 `true`）：启动时若集合不存在，由 **`MilvusSchemaService`** 按 Spring AI `MilvusVectorStore` 同款字段建表并建索引、`loadCollection`；**`ensure-travel-poi-schema`** 仍为旅游 POI 骨架开关。
 
 ---
 
-## 6. 相关路径速查
+## 4. Bean 装配（摘要）
+
+- **`LoveQAService` / `LoveQAConversationStore` / `MilvusSchemaService`**：在 **`LoveQaRagBeansConfiguration`** 中声明为 `@Bean`（**不再**使用 `@ConditionalOnBean`）；**`loveQAService`** 使用 **`@DependsOn("milvusSchemaService")`**，保证 **`MilvusSchemaService`** 的 `@PostConstruct` 先完成集合就绪逻辑。
+- **`RagMilvusConfiguration`**：注册业务封装 **`lovespaceMilvusClient`**（类型 `com.meng.lovespace.ai.milvus.MilvusClient`），**避免**与 Spring AI 自动配置中名为 **`milvusClient`** 的 `MilvusServiceClient` Bean **重名**（勿改回 `milvusClient`，除非开启 `spring.main.allow-bean-definition-overriding`）。
+- **已移除**：`lovespace.ai.rag.enabled`、`RagMilvusAutoConfigurationExclusionEnvironmentPostProcessor`（不再按开关排除 Milvus 自动配置）。
+
+---
+
+## 5. API（用户服务）
+
+- **`POST /api/v1/ai/love-qa/ingest`**：知识库入库（需登录；依赖 Milvus + `EmbeddingModel` + Redis）。
+- **`POST /api/v1/ai/love-qa/chat`**：多轮问答，**非流式**，`ApiResponse<LoveQaChatResponseData>`（前端 `http` timeout ≥ 120s 仍可用作兼容）。
+- **`POST /api/v1/ai/love-qa/chat/stream`**：**流式 SSE**，`Content-Type: text/event-stream`；`LoveQAController` 在**虚拟线程**中调用 **`LoveQaChatFacade.chatStream`**；SSE **事件名**与 JSON **字符串**载荷：
+  - **`meta`**：`{"conversationId":"..."}`（首轮即下发，新会话在此拿到 UUID）
+  - **`delta`**：`{"t":"..."}`（模型**增量**文本；通义侧 `GenerationParam.incrementalOutput(true)` + `streamCall`）
+  - **`done`**：`{"reply":"...","conversationId":"..."}`（与 Redis 已写入的整轮一致）
+  - **`error`**：`{"code":...,"message":"..."}`（如 40491 会话不存在、40391 越权等）
+  流正常结束后由 Controller 调用 **`LoveQaConversationService.appendChatRound`** 写 **MySQL**（与 `/chat` 一致）。**超时**：`SseEmitter` 120s。
+- **`GET /api/v1/ai/love-qa/conversations`**、**`GET .../conversations/{id}/messages`**：历史（MySQL）。
+
+**会话 Redis 回填**：在 **`/chat`** 与 **`/chat/stream`** 中，若请求带 `conversationId` 且 **`LoveQAConversationStore`** 中无键，则先调用 **`LoveQaConversationService.restoreRedisSessionIfMissing`**，从 **`love_qa_messages`** 恢复最近若干轮（受 **`lovespace.ai.rag.max-history-pairs`** 限制）再调 RAG，避免「历史会话点开后续聊无记忆」。
+
+若 Milvus 或 DashScope Key 未就绪，应用**启动阶段**可能失败（不再通过条件注解静默跳过 RAG Bean）。
+
+**反向代理**：若经 nginx 等代理 SSE，需关闭对响应体的过度缓冲（如 `proxy_buffering off`），否则增量可能攒包后才到浏览器。
+
+---
+
+## 5.1 多轮记忆与 LLM 调用（实现要点）
+
+- **`LoveQAService`**：`prepareChat`（解析/创建会话、Milvus 检索、拼 system 与 `priorForLlm`）与 **`persistRound`**（写入 user+assistant、`trimHistory`、`conversationStore.save`）被 **`chat`** 与 **`chatStream`** 共用。
+- **`LoveQaChatFacade`**：除 **`chat`** 外增加 **`chatStream(LoveQaChatParams, LoveQaStreamCallback)`**；回调顺序 **`onMeta` → 多次 `onDelta` → `onCompleted`**（`onCompleted` 在 Redis 持久化完成之后触发，供 Controller 发 `done` 与落 MySQL）。
+- **`LLMProvider`**：**`chatWithSystemAndHistory`**（整段返回）与 **`chatWithSystemAndHistoryStreaming`**（`Consumer<String> onDelta`）。**`QwenProvider`**：`buildChatMessages` + **`Generation.streamCall`** + **`incrementalOutput(true)`**。**`OpenAiProvider`**：`ChatClient.prompt(Prompt).stream().content()`（`Flux`）。默认实现将整段一次性 `onDelta`。
+
+---
+
+## 6. 前端
+
+- 路由 **`/love-qa`**；页面 **`lovespace-frontend/src/pages/AILoveQA.tsx`**；API **`services/loveQa.ts`**。
+- **主路径**：**`postLoveQaChatStream`**（`fetch` + `ReadableStream`，解析 **`meta` / `delta` / `done` / `error`**；`AbortController` 120s；`VITE_SESSION_DISTRIBUTED` 时 `credentials: 'include'` 与 axios 一致）。**`postLoveQaChat`** 仍保留为非流式兼容。
+- **布局（千问式 + 全站玫瑰色）**：大屏 **侧栏**（新建对话、最近会话列表、刷新）+ **主区**；空状态居中问候 + 大圆角输入区；有消息时 **消息区可滚动**、底部输入区 **`shrink-0`**。根容器 **`h-[calc(100dvh-11rem)]`** 等，避免长对话撑开整页；**`useLayoutEffect`** 在**切换会话**时瞬间滚到底、同会话内新消息平滑滚动。
+
+---
+
+## 7. 相关路径速查
 
 | 用途 | 路径 |
 |------|------|
-| User POM Profile | `lovespace-backend/lovespace-user/pom.xml`（`lovespace-rag`） |
-| 应用配置 | `lovespace-backend/lovespace-user/src/main/resources/application.yml` |
-| RAG 实现与 EPP | `lovespace-backend/lovespace-ai-rag/` |
-| Facade 与 DTO | `lovespace-backend/lovespace-ai/`（`api/`、`dto/`、`exception/`） |
-| 前端页面 | `lovespace-frontend/src/pages/AILoveQA.tsx` |
-| 前端 API | `lovespace-frontend/src/services/loveQa.ts` |
+| User 依赖与打包 | `lovespace-backend/lovespace-user/pom.xml` |
+| 应用与 Milvus 片段 | `lovespace-backend/lovespace-user/src/main/resources/application.yml` |
+| RAG 实现 | `lovespace-backend/lovespace-ai/`（`com.meng.lovespace.ai.rag`、`com.meng.lovespace.ai.milvus`） |
+| Facade / DTO | `lovespace-backend/lovespace-ai/` |
+| 启动类扫描 | `lovespace-backend/lovespace-user/src/main/java/com/meng/lovespace/user/LoveSpaceUserApplication.java` |
+| 前端 | `lovespace-frontend/src/pages/AILoveQA.tsx`、`lovespace-frontend/src/services/loveQa.ts` |
 
 ---
 
-文档随实现迭代可更新；重大架构变更请同步 `memory/decisions.md`（若项目约定要求）。
+## 8. 嵌入与 OpenAI
+
+默认 **DashScope** 嵌入；`application.yml` 排除 **`OpenAiEmbeddingAutoConfiguration`**。若改用 OpenAI 嵌入，需自行调整排除项与 `lovespace.ai.embedding.provider`，并保证 **`EmbeddingModel`** 与 Milvus 维度一致。
+
+---
+
+文档随实现迭代更新；架构总览见 `memory/decisions.md`，部署见 `memory/DEPLOYMENT.md`。

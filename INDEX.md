@@ -13,7 +13,7 @@
 | 环境依赖、脚本顺序、已知风险与非阻塞项 | [blockers.md](./blockers.md) |
 | 产品与技术目标、范围 | [goals.md](./goals.md) |
 | Docker、nginx、MinIO、构建与 403 等问题 | [DEPLOYMENT.md](./DEPLOYMENT.md) |
-| 恋爱问答 RAG、Milvus、Maven Profile、前后端路径与注意点 | [love-qa-rag.md](./love-qa-rag.md) |
+| 恋爱问答 RAG、Milvus、前后端路径与注意点 | [love-qa-rag.md](./love-qa-rag.md) |
 
 ## 文件一览（一句话）
 
@@ -23,11 +23,11 @@
 | **CODING_RULES.md** | 编码规则：后端/前端风格、注释、日志；与 `decisions.md` 一并生效 |
 | **PROJECT_STRUCTURE.md** | 根目录与前后端目录说明、API 与前端路由速查 |
 | **decisions.md** | 关键决策：模块划分、DB、JWT/Session、WS、纪念日与前端 IA 等 |
-| **progress.md** | 实时进度：已落地功能、账号手机号、分片上传、部署要点等 |
+| **progress.md** | 实时进度：已落地功能、账号手机号、分片上传、部署要点、**对话任务摘要**（含近期联调修复） |
 | **blockers.md** | 障碍与依赖：JDK/MySQL/Redis 脚本、注意事项 |
 | **goals.md** | 最终目标与拆解 |
-| **DEPLOYMENT.md** | 容器化部署（含 **Milvus/etcd**、与业务 **共用 MinIO**、`lovespace-rag` 构建）、MinIO 公网 URL 与桶策略 |
-| **love-qa-rag.md** | 恋爱知识库 RAG：模块分工、`-Plovespace-rag`、**DashScope 嵌入** + Milvus、API/前端速查 |
+| **DEPLOYMENT.md** | 容器化部署（含 **Milvus/etcd**、与业务 **共用 MinIO**、后端 fat jar 构建说明）、MinIO 公网 URL 与桶策略 |
+| **love-qa-rag.md** | 恋爱知识库 RAG：`lovespace-ai`（含 RAG）默认打入 user、**DashScope 嵌入** + Milvus、集合启动自检；含 **多轮记忆（多消息 LLM + Redis/MySQL 回填）**、**SSE 流式 `/chat/stream`**、前端页布局与滚动约定 |
 
 ## 建议加载顺序（典型任务）
 

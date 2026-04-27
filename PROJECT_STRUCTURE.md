@@ -17,15 +17,14 @@ meng-lovespace/
 │   ├── PROJECT_STRUCTURE.md         # 本文件
 │   ├── CODING_RULES.md              # 编码规则（风格、注释、日志）
 │   ├── DEPLOYMENT.md                # 容器部署与 MinIO/403 说明
-│   └── love-qa-rag.md               # 恋爱问答 RAG、Milvus、Profile、DashScope 嵌入
+│   └── love-qa-rag.md               # 恋爱问答 RAG、Milvus、DashScope 嵌入、集合自检
 │
 ├── lovespace-backend/               # 后端（Maven 多模块）
 │   ├── Dockerfile                   # 可执行 jar → 镜像
 │   ├── pom.xml                      # 父 POM：Java 21、Spring Boot 3.4.x、spring-ai-bom、compiler parameters
 │   ├── lovespace-common/            # 公共模块（ApiResponse 等）
-│   ├── lovespace-ai/                # AI：LLM、DashScope 嵌入、旅游规划（Travel）、通用对话 Controller
-│   ├── lovespace-ai-rag/            # 可选：Milvus、LoveQAService、RAG 配置（由 lovespace-user 的 Profile lovespace-rag 引入）
-│   └── lovespace-user/              # 用户服务（可执行 Spring Boot；依赖 lovespace-ai）
+│   ├── lovespace-ai/                # AI：LLM、DashScope 嵌入、旅游规划、通用对话 Controller；RAG（Milvus、LoveQAService 等）
+│   └── lovespace-user/              # 用户服务（可执行 Spring Boot；依赖 lovespace-ai，含 RAG）
 │       ├── src/main/java/com/meng/lovespace/user/
 │       │   ├── config/              # Security、JWT、Session、MyBatis-Plus、OSS/本地存储等
 │       │   ├── controller/          # Auth、User、Couple、Timeline、Album、Message、Plan、EmotionAnalysis、LoveLetter、LoveQA、MemorialDay
@@ -73,7 +72,7 @@ meng-lovespace/
 | **消息** | `/messages/send` POST、`/messages` GET、`/messages/{id}/read` PUT、`/messages/{id}/retract` POST、`/messages/scheduled` POST | 需登录 |
 | **共同计划** | `/plans` POST GET；`/plans/{id}` PUT DELETE；`/plans/{id}/tasks` POST；`/plans/{id}/tasks/{taskId}` PUT（PlanTaskReplaceRequest）、DELETE；`/plans/{id}/expenses` GET POST；`/plans/{id}/expenses/{expenseId}` PUT（PlanExpenseReplaceRequest）、DELETE | 需登录 |
 | **纪念日** | **`/memorial-days`** POST GET GET/{id} PUT/{id} DELETE/{id}；**`/memorial-days/next`**、**`/memorial-days/upcoming`** | 需登录 |
-| **AI** | **POST /ai/chat** 通用对话；**GET /ai/emotion?…** 情感分析；**POST /ai/love-letter** 情书；**POST /ai/love-qa/ingest|chat** 恋爱 RAG（需 **`-Plovespace-rag`**、Milvus、**DashScope 嵌入** 等）；**GET /ai/love-qa/conversations**、**GET /ai/love-qa/conversations/{id}/messages** 问答历史；**POST /ai/travel/plan** 情侣旅游 JSON 规划 | 需登录；长耗时接口前端超时建议 ≥120s |
+| **AI** | **POST /ai/chat** 通用对话；**GET /ai/emotion?…** 情感分析；**POST /ai/love-letter** 情书；**POST /ai/love-qa/ingest|chat|chat/stream** 恋爱 RAG（`/chat` 非流式，`/chat/stream` **SSE**；需 **Milvus**、**DashScope 嵌入**、Redis；默认随 `lovespace-ai` 打入）；**GET /ai/love-qa/conversations**、**GET /ai/love-qa/conversations/{id}/messages** 问答历史；**POST /ai/travel/plan** 情侣旅游 JSON 规划 | 需登录；长耗时接口前端超时建议 ≥120s；流式用 `fetch`+SSE |
 
 **WebSocket（非 `/api` 前缀）**：`ws://<host>:8081/ws/chat?token=<JWT>`，消息体 JSON。
 

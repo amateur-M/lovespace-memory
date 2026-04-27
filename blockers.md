@@ -12,7 +12,7 @@
 
 ## 已知注意事项（非阻塞）
 
-1. **配置与密钥**：`application.yml` 中 JWT secret、数据库密码等应为本地/环境自有配置，勿提交敏感信息到公共仓库。AI 功能（对话、情感分析、情书）依赖 `spring.ai.dashscope.api-key`（通义千问）；未配置时相关接口将失败或回退为纯统计/错误提示。**恋爱问答 RAG**（`lovespace.ai.rag.enabled=true` 且 **`mvn -Plovespace-rag`**）另需 **Milvus** 可达、`lovespace.ai.embedding.*` 与 **`spring.ai.vectorstore.milvus.*`** 一致；Compose 见根目录 `docker-compose.yml`（**milvus-etcd**、**milvus**、共用 **minio**）。嵌入与聊天共用 **`SPRING_AI_DASHSCOPE_API_KEY`**，一般不再需要仅为 RAG 配置 OpenAI Key
+1. **配置与密钥**：`application.yml` 中 JWT secret、数据库密码等应为本地/环境自有配置，勿提交敏感信息到公共仓库。AI 功能（对话、情感分析、情书）依赖 `spring.ai.dashscope.api-key`（通义千问）；未配置时相关接口将失败或回退为纯统计/错误提示。**恋爱问答 RAG** 已随 **`lovespace-ai`** 打入，需 **Milvus** 可达、`lovespace.ai.embedding.*` 与 **`spring.ai.vectorstore.milvus.*`**（含 **`embedding-dimension`**）一致；部署时可设 **`LOVESPACE_MILVUS_ENSURE_LOVE_KNOWLEDGE_SCHEMA=true`** 与 **`SPRING_AI_VECTORSTORE_MILVUS_INITIALIZE_SCHEMA=true`** 确保集合就绪。Compose 见根目录 `docker-compose.yml`（**milvus-etcd**、**milvus**、共用 **minio**）。嵌入与聊天共用 **`SPRING_AI_DASHSCOPE_API_KEY`**，一般不再需要仅为 RAG 配置 OpenAI Key
 2. **前端构建**：Vite 可能对主 chunk 体积告警，不影响功能
 3. **邀请流程**：已实现 `/inbox` 与 `pending-invites` API，被邀请方在消息页接受；若仍手调 API，需 `bindingId` 调用 `POST /couple/accept`
 4. **时间轴媒体与静态访问**：直传依赖 `POST /api/v1/timeline/upload`；本机访问依赖 `LocalFileRangeController` 的 `GET /local-files/**`（含 Range）。生产需配置正确的 `public-base-url` 或 OSS；反向代理需正确转发 Range/If-Range，避免破坏视频分段缓冲
@@ -21,7 +21,7 @@
 7. **相册灯箱**：`PhotoViewer` 仅加载当前分页内的照片，左右切换不跨页；需跨页浏览时先换页再点开
 8. **相册照片元数据 PUT**：`PUT /api/v1/albums/{albumId}/photos/{photoId}` 为四字段整单替换（`description`、`locationJson`、`takenDate`、`tagsJson`，均可为 null 表示清空）；第三方客户端须显式传齐字段，避免误清空
 9. **Python（可选）**：本地若需运行 ui-ux-pro-max 的 `search.py`，需已安装 Python；不影响主程序编译运行
-10. **WebSocket 与生产部署**：浏览器无法通过 Vite 代理自动转发 `ws://`，需同源、反向代理 Upgrade/Connection 头，或前端直连后端域名；生产需配置 WSS 与跨域
+10. **WebSocket 与部署**：本地开发已在 `vite.config.ts` 将 **`/ws`** 代理到 8081（含 `ws: true`）；`VITE_API_BASE_URL` 为空时私密消息页用同源 `ws(s)://当前 host/ws/chat`。生产需 **nginx** 等对 `/ws/**` 配置 **Upgrade / Connection**（见 `lovespace-frontend/nginx.conf`）。私密消息发送在 WS 未就绪时可 **回退 HTTP**（`POST /api/v1/messages/send` / `/scheduled`），见 `progress.md` 对话摘要
 11. **私密消息 JWT**：WebSocket 使用 query `token` 传参，需注意 URL 长度与日志泄露风险（生产建议仅 HTTPS/WSS + 短链或子协议方案演进）
 12. **共同计划预算**：若历史数据仅在 `couple_plans.budget_spent` 中、无 `plan_expenses` 流水，接口汇总 `budgetSpent` 可能为 0；需补录消费或自行迁移
 13. **分布式 Session 前端**：须设置 `VITE_SESSION_DISTRIBUTED=true` 并重启 dev server 后 `withCredentials` 才生效；`VITE_API_BASE_URL` 指向另一 origin（如直连 8081）时需后端 CORS 与浏览器 Cookie 策略配合，推荐开发时 baseURL 为空走 Vite `/api` 代理

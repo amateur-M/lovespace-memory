@@ -1,6 +1,6 @@
 # LoveSpace 容器化部署说明
 
-本文汇总仓库根目录 **`docker-compose.yml`**、**`lovespace-backend/Dockerfile`**、**`lovespace-frontend/Dockerfile`**、**`lovespace-frontend/nginx.conf`**、**`env.example`** 的用法与常见问题。详细命令以服务器实际路径为准（示例：`/projects/lovespace/`）。
+本文汇总仓库根目录 `**docker-compose.yml**`、`**lovespace-backend/Dockerfile**`、`**lovespace-frontend/Dockerfile**`、`**lovespace-frontend/nginx.conf**`、`**env.example**` 的用法与常见问题。详细命令以服务器实际路径为准（示例：`/projects/lovespace/`）。
 
 ---
 
@@ -37,15 +37,15 @@
 
 ### 后端（多模块）
 
-在 **`lovespace-backend`** 父目录执行：
+在 `**lovespace-backend`** 父目录执行：
 
 ```bash
-mvn -pl lovespace-user -am package -DskipTests -Plovespace-rag
+mvn -pl lovespace-user -am package -DskipTests
 ```
 
-将 **`lovespace-user/target/lovespace-user-0.0.1-SNAPSHOT.jar`**（版本号以实际为准）复制到部署目录 **`lovespace-backend/target/`**，且**只保留一个** jar，或复制为 **`lovespace-backend/app.jar`**。
+将 `**lovespace-user/target/lovespace-user-0.0.1-SNAPSHOT.jar**`（版本号以实际为准）复制到部署目录 `**lovespace-backend/target/**`，且**只保留一个** jar，或复制为 `**lovespace-backend/app.jar`**。
 
-**可执行 jar 要求**：`META-INF/MANIFEST.MF` 中含 Spring Boot **`JarLauncher`**（父 POM 已在 **`pluginManagement`** 为 **`spring-boot-maven-plugin`** 指定 **`${spring-boot.version}`**，`lovespace-user` 模块执行 **`repackage`**）。若出现 **`no main manifest attribute`**，多为拷错模块 jar（如 common/ai）或未完整执行 **`package`**。
+**可执行 jar 要求**：`META-INF/MANIFEST.MF` 中含 Spring Boot `**JarLauncher`**（父 POM 已在 `**pluginManagement`** 为 `**spring-boot-maven-plugin**` 指定 `**${spring-boot.version}**`，`lovespace-user` 模块执行 `**repackage**`）。若出现 `**no main manifest attribute**`，多为拷错模块 jar（如 common/ai）或未完整执行 `**package**`。
 
 ### 前端
 
@@ -53,29 +53,31 @@ mvn -pl lovespace-user -am package -DskipTests -Plovespace-rag
 npm run build
 ```
 
-将 **`dist/`** 同步到 **`lovespace-frontend/dist/`**。
+将 `**dist/**` 同步到 `**lovespace-frontend/dist/**`。
 
 ---
 
 ## 3. 环境变量
 
-复制 **`env.example`** 为 **`.env`**（与 `docker-compose.yml` 同级）。Docker Compose 变量插值语法为 **`${VAR:-默认值}`**（**`:-`**），不能写成 **`${VAR:值}`**。
+复制 `**env.example**` 为 `**.env**`（与 `docker-compose.yml` 同级）。Docker Compose 变量插值语法为 `**${VAR:-默认值}**`（`**:-**`），不能写成 `**${VAR:值}**`。
 
-首次部署需在 **MySQL** 中执行 **`lovespace-user/src/main/resources/sql/`** 下脚本建库表；**MinIO** 需在控制台或 **`mc`** 创建与 **`LOVESPACE_MINIO_BUCKET`** 一致的桶。
+首次部署需在 **MySQL** 中执行 `**lovespace-user/src/main/resources/sql/`** 下脚本建库表；**MinIO** 需在控制台或 `**mc`** 创建与 `**LOVESPACE_MINIO_BUCKET**` 一致的桶。
 
 ---
 
 ## 4. 编排服务说明
 
-| 服务 | 说明 |
-|------|------|
-| **milvus-etcd** | Milvus 元数据存储（etcd）；数据卷 `./data/milvus/etcd`。 |
-| **milvus** | 向量库服务；端口 `19530`（gRPC）和 `9091`（HTTP）；数据卷 `./data/milvus/standalone`；对象存储**复用**下方 **minio**（与业务同一 `MINIO_ROOT_*`）。 |
-| **mysql** | 数据卷 `./data/mysql`；健康检查通过后 **`backend`** 再启动。 |
-| **redis** | 数据卷 `./data/redis`；分布式 Session 与黑名单等依赖。 |
-| **minio** | API 默认映射 **9000**，控制台 **9001**；数据卷 `./data/minio`。 |
-| **backend** | 环境变量覆盖 **`application.yml`**：如 **`SPRING_DATASOURCE_URL`** 指向 `mysql:3306`、**`MILVUS_HOST=milvus`**、**`LOVESPACE_AI_RAG_ENABLED=true`**、**`LOVESPACE_MINIO_ENDPOINT`=`http://minio:9000`**，等。 |
-| **frontend** | 反代 **`/api/`**、**`/local-files/`**、**`/ws/`** → **`backend:8081`**；**`client_max_body_size`** 与后端大文件上传对齐。 |
+
+| 服务              | 说明                                                                                                                                                                                                                                                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **milvus-etcd** | Milvus 元数据存储（etcd）；数据卷 `./data/milvus/etcd`。                                                                                                                                                                                                                                                                      |
+| **milvus**      | 向量库服务；端口 `19530`（gRPC）和 `9091`（HTTP）；数据卷 `./data/milvus/standalone`；对象存储**复用**下方 **minio**（与业务同一 `MINIO_ROOT_*`）。                                                                                                                                                                                                 |
+| **mysql**       | 数据卷 `./data/mysql`；健康检查通过后 `**backend`** 再启动。                                                                                                                                                                                                                                                                     |
+| **redis**       | 数据卷 `./data/redis`；分布式 Session 与黑名单等依赖。                                                                                                                                                                                                                                                                           |
+| **minio**       | API 默认映射 **9000**，控制台 **9001**；数据卷 `./data/minio`。                                                                                                                                                                                                                                                                |
+| **backend**     | 环境变量覆盖 `**application.yml`**：如 `**SPRING_DATASOURCE_URL**` 指向 `mysql:3306`、`**MILVUS_HOST=milvus**`、`**SPRING_AI_DASHSCOPE_API_KEY**`、`**SPRING_AI_VECTORSTORE_MILVUS_*`**（集合名 / `INITIALIZE_SCHEMA` 等）、*`*LOVESPACE_MILVUS_ENSURE_LOVE_KNOWLEDGE_SCHEMA`**、**`LOVESPACE_MINIO_ENDPOINT`=`http://minio:9000`**，等。 |
+| **frontend**    | 反代 `**/api/`**、`**/local-files/`**、`**/ws/**` → `**backend:8081**`；`**client_max_body_size**` 与后端大文件上传对齐。                                                                                                                                                                                                         |
+
 
 仅启动基础依赖（含 Milvus）：
 
@@ -89,7 +91,9 @@ docker compose up -d milvus-etcd minio milvus mysql redis
 docker compose build
 docker compose up -d
 ```
+
 看日志：
+
 ```bash
 docker compose logs backend --tail 80
 ```
@@ -98,17 +102,20 @@ docker compose logs backend --tail 80
 
 ## 5. 前端与 WebSocket（同源部署）
 
-生产环境 **`VITE_API_BASE_URL` 留空** 时，请求走同源 **`/api`**。**`Chat.tsx`** 在 `VITE_API_BASE_URL` 为空时使用 **`ws://`/`wss://` + `window.location.host`** 连接 **`/ws/chat`**，需保证 Nginx 对 **`/ws/`** 配置 **`Upgrade`** / **`Connection`**（仓库内 `nginx.conf` 已配置）。
+生产环境 `**VITE_API_BASE_URL` 留空** 时，请求走同源 `**/api`**。`**Chat.tsx`** 在 `VITE_API_BASE_URL` 为空时使用 `**ws://`/`wss://` + `window.location.host**` 连接 `**/ws/chat**`，需保证 Nginx 对 `**/ws/**` 配置 `**Upgrade**` / `**Connection**`（仓库内 `nginx.conf` 已配置）。
 
 ---
 
 ## 6. 恋爱问答 RAG（Milvus）专项检查
 
-1. 后端构建必须带 Profile：`-Plovespace-rag`（否则产物不含 `lovespace-ai-rag`）。
-2. `LOVESPACE_AI_RAG_ENABLED=true`，并保证 **`SPRING_AI_DASHSCOPE_API_KEY`** 有效（聊天与 **DashScope 文本嵌入**共用；Milvus 需要 `EmbeddingModel`）。
-3. Compose 内后端使用 `MILVUS_HOST=milvus`、`MILVUS_PORT=19530` 连接向量库；Milvus 与业务共用 **minio**（无需第二个 MinIO 容器）。
-4. 首次启动后先调用 `/api/v1/ai/love-qa/ingest` 再调用 `/api/v1/ai/love-qa/chat` 验证链路。
-5. 若 `chat`/`ingest` 路由缺失，优先检查是否漏了 `-Plovespace-rag` 或 `LOVESPACE_AI_RAG_ENABLED` 未生效。
+1. 后端 `**mvn -pl lovespace-user -am package**` 产物已默认包含 `**lovespace-ai**`（含 RAG/Milvus），**不要**再依赖 `-Plovespace-rag`。
+2. 配置 `**SPRING_AI_DASHSCOPE_API_KEY`**（聊天与 **DashScope 文本嵌入**共用；Milvus 需要 `EmbeddingModel`）。
+3. Compose 内后端使用 `**MILVUS_HOST=milvus`**、`**MILVUS_PORT=19530**`；建议显式设置 `**SPRING_AI_VECTORSTORE_MILVUS_INITIALIZE_SCHEMA=true**` 与 `**LOVESPACE_MILVUS_ENSURE_LOVE_KNOWLEDGE_SCHEMA=true**`（与仓库 `docker-compose.yml` 一致），避免集合未创建导致入库报错。
+4. `**spring.ai.vectorstore.milvus.embedding-dimension**` 与 `**lovespace.ai.embedding.dimensions**` 保持一致。
+5. Milvus 与业务共用 **minio**（无需第二个 MinIO 容器）。
+6. 首次启动后先调用 `**POST /api/v1/ai/love-qa/ingest`**，再调用 `**POST /api/v1/ai/love-qa/chat**`（非流式）或 `**POST /api/v1/ai/love-qa/chat/stream**`（**SSE**）验证链路。
+7. 经 **Nginx** 等反代 `**/api/**`** 时，`**text/event-stream**` 建议关闭响应缓冲（如 `**proxy_buffering off**`）、`**proxy_read_timeout**` 足够长（≥120s），否则恋爱问答流式可能攒包或中途断连。
+8. 若启动失败或入库报 **collection not found**，查看后端日志中 `**MilvusSchemaService`** 与 `**Creating Milvus collection**` / 异常栈；核对 Milvus 服务与上述环境变量。
 
 ---
 
@@ -116,16 +123,16 @@ docker compose logs backend --tail 80
 
 ### 7.1 返回给前端的 URL 形态
 
-**`MinioAvatarStorageService.buildUrl`**（`lovespace.minio`）：
+`**MinioAvatarStorageService.buildUrl`**（`lovespace.minio`）：
 
-- 若配置了 **`lovespace.minio.public-base-url`**，返回 **`{publicBaseUrl}/{bucket}/{objectKey}`**（**`publicBaseUrl` 末尾不要带桶名**，避免重复；代码已含 **`bucket`** 段）。
-- 未配置时，使用 **`http://{strip(endpoint)}/{bucket}/{objectKey}`**（**`endpoint` 为 `http://minio:9000` 时浏览器无法解析主机名 `minio`**，生产应配置 **`LOVESPACE_MINIO_PUBLIC_BASE_URL`** 为浏览器可访问地址，如 **`http://公网IP:9000`** 或域名）。
+- 若配置了 `**lovespace.minio.public-base-url`**，返回 `**{publicBaseUrl}/{bucket}/{objectKey}**`（`**publicBaseUrl` 末尾不要带桶名**，避免重复；代码已含 `**bucket`** 段）。
+- 未配置时，使用 `**http://{strip(endpoint)}/{bucket}/{objectKey}`**（`**endpoint` 为 `http://minio:9000` 时浏览器无法解析主机名 `minio**`，生产应配置 `**LOVESPACE_MINIO_PUBLIC_BASE_URL**` 为浏览器可访问地址，如 `**http://公网IP:9000**` 或域名）。
 
 ### 7.2 浏览器 403 Forbidden
 
-直链 **`http://IP:9000/bucket/object`** 时，匿名 **GET** 需桶策略允许读；默认桶为**私有**，会 **403**。处理：
+直链 `**http://IP:9000/bucket/object**` 时，匿名 **GET** 需桶策略允许读；默认桶为**私有**，会 **403**。处理：
 
-- 在 MinIO 控制台为桶设置 **匿名下载 / readonly**（或 **`mc anonymous set download`**），或
+- 在 MinIO 控制台为桶设置 **匿名下载 / readonly**（或 `**mc anonymous set download`**），或
 - 使用 **预签名 URL**（当前代码未实现，需后续扩展）。
 
 **仅加 Nginx 反代不能消除 403**，除非反代到后端并由服务端带签名拉流（当前未实现）。
@@ -134,19 +141,22 @@ docker compose logs backend --tail 80
 
 ## 8. 故障排查简表
 
-| 现象 | 可能原因 |
-|------|----------|
-| 后端 **`no main manifest attribute`** | 非 `lovespace-user` fat jar 或未 **`repackage`**。 |
-| Compose 插值报错 | 使用 **`${VAR:-default}`** 语法。 |
-| 恋爱问答接口 404 | 未使用 `-Plovespace-rag` 构建，或 `LOVESPACE_AI_RAG_ENABLED=false`。 |
-| Milvus 连接失败 | 检查 `milvus` 服务状态、`MILVUS_HOST/MILVUS_PORT` 与端口映射。 |
-| 图片 403 | 桶未开放匿名读；或 URL 缺少 **`/{bucket}/`** 段导致路径错误。 |
-| 图片无法加载（内网 `minio` 主机名） | 配置 **`LOVESPACE_MINIO_PUBLIC_BASE_URL`** 为公网可访问 MinIO 基址。 |
+
+| 现象                                  | 可能原因                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 后端 `**no main manifest attribute`** | 非 `lovespace-user` fat jar 或未 `**repackage`**。                                                                           |
+| Compose 插值报错                        | 使用 `**${VAR:-default}**` 语法。                                                                                             |
+| 恋爱问答入库失败 / collection 不存在           | Milvus 未就绪、`**SPRING_AI_VECTORSTORE_MILVUS_***` 与嵌入维度不一致，或关闭 `**LOVESPACE_MILVUS_ENSURE_LOVE_KNOWLEDGE_SCHEMA**` 后未手工建表。 |
+| Milvus 连接失败                         | 检查 `milvus` 服务状态、`MILVUS_HOST/MILVUS_PORT` 与端口映射。                                                                        |
+| 图片 403                              | 桶未开放匿名读；或 URL 缺少 `**/{bucket}/**` 段导致路径错误。                                                                               |
+| 图片无法加载（内网 `minio` 主机名）              | 配置 `**LOVESPACE_MINIO_PUBLIC_BASE_URL**` 为公网可访问 MinIO 基址。                                                                |
+
 
 ---
 
 ## 9. 相关代码与配置
 
-- 后端存储：**`MinioAvatarStorageService`**、**`MinioProperties`**（`lovespace.minio.*`）。
-- 前端媒体 URL：**`utils/mediaUrl.ts`**（`resolveMediaUrl`）。
-- 编排与镜像：仓库根 **`docker-compose.yml`**、**`lovespace-backend/Dockerfile`**、**`lovespace-frontend/Dockerfile`**、**`lovespace-frontend/nginx.conf`**、**`env.example`**。
+- 后端存储：`**MinioAvatarStorageService**`、`**MinioProperties**`（`lovespace.minio.*`）。
+- 前端媒体 URL：`**utils/mediaUrl.ts**`（`resolveMediaUrl`）。
+- 编排与镜像：仓库根 `**docker-compose.yml**`、`**lovespace-backend/Dockerfile**`、`**lovespace-frontend/Dockerfile**`、`**lovespace-frontend/nginx.conf**`、`**env.example**`。
+
