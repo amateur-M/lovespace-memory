@@ -6,6 +6,12 @@
 - **账号与登录（手机号）**：登录/注册使用 **中国大陆 11 位手机号**（`PhoneNormalizer` + `^1[3-9]\d{9}$`）；**邮箱**不在注册环节收集，在 `**PUT /api/v1/user/profile`** 中可选填或清空；**用户名**展示名可在资料页修改（唯一性校验）。**情侣邀请**：`POST /api/v1/couple/invite` body 为 `**inviteePhone`**（按手机号查找用户，不再使用 `inviteeUserId`）。JWT 含 `phone` claim（`JwtUtil.CLAIM_PHONE`）；`getPhone(claims)` 可回退读旧 token 的 `email` claim 以兼容过渡期。存量库执行 `sql/users_add_phone_account.sql`；新库用 `users.sql`（含 `phone` UNIQUE、`email` 可空）
 - **纪念日倒计时**：后端 `/api/v1/memorial-days`（CRUD、`/next` 最近倒计时、`/upcoming` 近期窗口）、表 `memorial_days`、Redis 缓存 `lovespace:memorial:next:{coupleId}` / `upcoming:{coupleId}`、配置 `lovespace.memorial.*`、定时 `MemorialDayCacheRefreshTask`；`MemorialCountdownCalculator` 用 `MonthDay` 做每年循环与剩余毫秒。前端：`Memorial.tsx` + `memorialStore` + `services/memorial.ts`；路由 `/memorial` 已在 `App.tsx` 注册，顶栏有「纪念日」入口。页面为简约浪漫 + 手绘感（玫瑰主色一致）：`MemorialRomanticDecor`（SVG 爱心/星光）、`MemorialPhotoWall`（从相册拉取照片、双环错落环绕布局、中心柔光；无照片时占位相框）；**恋爱倒计时与祝福语区块在照片墙上方**；照片用 Ant Design `**Image` + `preview`**（列表用缩略图、预览优先原图 `imageUrl`）；**新建**主要靠右下角 FloatButton，折叠面板「全部纪念日」仅列表编辑/删除（**页内已移除月历与标题区新建按钮**）；内容区 `**w-full`** 与 `AppLayout` 的 `max-w-6xl` 对齐。字体：`index.html` 引入 Caveat、马善政；`index.css` 含 `memorial-display` / `memorial-accent` / `memorial-polaroid` 与星光动画（`prefers-reduced-motion` 下减弱）
 - **AI 能力**（`lovespace-ai` + `lovespace-user`）：Spring AI 1.0（`spring-ai-starter-model-openai`，聊天可选 OpenAI）+ 通义千问（阿里云 DashScope Java SDK）；`LLMProvider`（`QwenProvider` / `OpenAiProvider`）、`LlmRouter` 与 `lovespace.ai.provider` 路由；`POST /api/v1/ai/chat` 通用对话；情感分析（`EmotionAnalysisService` + `GET /api/v1/ai/emotion`）；情书生成（`LoveLetterService` + `POST /api/v1/ai/love-letter`）；**Milvus 向量库**（`spring-ai-starter-vector-store-milvus`，与 LLM 同在 `**lovespace-ai`**）+ 恋爱 RAG（`LoveQAService`，`POST /api/v1/ai/love-qa/ingest`、`/chat`、`/chat/stream` SSE）：**默认打入 user 可执行包**（**无需** `-Plovespace-rag`），需 **Milvus**、`**EmbeddingModel`**、Redis；嵌入默认 `**DashScopeEmbeddingModel**`（`text-embedding-v2` 等），与聊天**共用** `spring.ai.dashscope.api-key`，配置见 `lovespace.ai.embedding.*`（**排除** `OpenAiEmbeddingAutoConfiguration`）；`**MilvusSchemaService`** 在 `**lovespace.milvus.ensure-love-knowledge-schema**`（默认 true）下启动自检建 `**love_knowledge_base**` 集合（与 Spring AI 表结构一致）；`**RagMilvusConfiguration**` 注册 `**lovespaceMilvusClient**` 避免与 Spring AI 的 `**milvusClient**` Bean 重名；**情侣旅游规划**（`TravelPlannerService`，`POST /api/v1/ai/travel/plan`，JSON 输出）。`application.yml` 含 `spring.ai.vectorstore.milvus.*`、`lovespace.ai.rag.*`、`lovespace.milvus.*`。父工程 Spring Boot 3.4.x + `spring-ai-bom` 以配套 Spring AI
+
+   **RAG 优化增强**（2026-05）：
+   - **Embedding 缓存**（`CachedEmbeddingModel`）：Redis 缓存 query → embedding 结果，标准化后 SHA-256 为 key；TTL 24h；预期 API 调用成本降低 60%，延迟 150ms → 5ms（命中时）。
+   - **Latency 分解埋点**（`RagMetricsCollector`）：记录 EMBEDDING/RETRIEVE/PROMPT_BUILD/LLM_FIRST_BYTE/LLM_TOTAL/PERSIST 各阶段耗时，DEBUG 日志输出。
+   - **检索可视化**：SSE 新增 `retrieved` 事件，前端展示 `📚 参考了 X 条知识` 引用卡片。
+   - **Prompt 压缩**（`PromptCompressor`）：检索片段去重（Jaccard 0.85）、上下文长度限制 8000 字符、历史精简（保留最近 10 轮）；预期 Token 消耗降低 20-40%。
 - 接口前缀统一 `/api/v1`；Vite 开发代理 `/api`、`/local-files`、`**/ws`（WebSocket，`ws: true`）** → 后端 8081
 - 父 POM 已启用 `maven-compiler-plugin parameters=true`，且 Controller 中关键 `@RequestParam`/`@PathVariable` 已写显式名称，避免 Spring 绑定报错
 - 前端已统一暖色主题（玫瑰主色 + 浅粉背景，Inter 字体），相册照片列表为等尺寸网格（aspect-square + object-cover）
@@ -267,3 +273,44 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 - **现象**：`VITE_API_BASE_URL` 为空时，开发环境 WebSocket 连到 Vite 端口但原先未代理 `/ws`，提示「WebSocket 未连接」；情感洞察页打开时内容/请求像「跑两遍」。
 - **修复（代码）**：`vite.config.ts` 增加 `**/ws` → 8081** 且 `**ws: true`**。`Chat.tsx`：WS 未就绪时 **HTTP** `POST /api/v1/messages/send` 与 `/scheduled`；WebSocket 依赖 `**partner?.id`**。`EmotionAnalysis.tsx`：`getEmotionReport` 传 **AbortSignal**，effect 清理时 **abort**，避免 StrictMode 重复请求与 loading 竞态；`EmotionAnalysisCharts.tsx`：**合并**饼图与折线图初始化为 **单个 `useEffect`**。
 - **文档**：`memory/decisions.md`（Vite 代理含 `/ws`）、`blockers.md`（第 10 条更新）、本文件「当前总体状态」与「页面与组件摘要」已同步。
+
+### RAG 优化实施（任务 61，2026-05）
+
+**目标**：提升恋爱问答 RAG 模块的性能、可观测性与用户体验，降低运营成本。
+
+**后端**：
+- **Embedding 缓存**：`CachedEmbeddingModel` 装饰器包装 `DashScopeEmbeddingModel`，Redis 缓存 embedding 结果；`EmbeddingCacheEntry` 含向量、模型版本、哈希校验；`EmbeddingCacheStore` 负责读写；`EmbeddingCacheAutoConfiguration` 自动装配；配置 `lovespace.ai.embedding.cache.*`。
+- **Latency 埋点**：`RagPhase` 枚举定义 6 个阶段；`RagTimer` 高精度计时（nanoTime）；`RagMetricsReport` 指标报告；`RagMetricsCollector` 收集器；集成到 `LoveQAService.chat()` 与 `chatStream()`。
+- **检索可视化**：`LoveQaStreamCallback` 新增 `onRetrieved()` 回调；`RetrievedChunk` DTO；`LoveQAController` SSE 发送 `retrieved` 事件。
+- **Prompt 压缩**：`DocumentDeduplicator` 相似度去重（Jaccard 0.85）；`PromptCompressor` 主入口（去重、长度限制 8000 字符、历史精简）；集成到 `LoveQAService.prepareChat()`。
+
+**前端**：
+- `services/loveQa.ts`：新增 `RetrievedChunk` 类型，`LoveQaChatStreamHandlers` 新增 `onRetrieved` 回调，SSE 解析处理 `retrieved` 事件。
+- `AILoveQA.tsx`：消息类型扩展 `retrievedChunks`，`onSend` 中处理 `onRetrieved`，UI 展示引用来源卡片 `📚 参考了 X 条知识：来源1、来源2...`。
+
+**新增文件**（ lovespace-backend/lovespace-ai ）：
+- `embedding/cache/CachedEmbeddingModel.java`
+- `embedding/cache/EmbeddingCacheEntry.java`
+- `embedding/cache/EmbeddingCacheKeyGenerator.java`
+- `embedding/cache/EmbeddingCacheStore.java`
+- `embedding/cache/EmbeddingCacheAutoConfiguration.java`
+- `rag/metrics/RagPhase.java`
+- `rag/metrics/RagTimer.java`
+- `rag/metrics/RagMetricsReport.java`
+- `rag/metrics/RagMetricsCollector.java`
+- `rag/compress/DocumentDeduplicator.java`
+- `rag/compress/PromptCompressor.java`
+- `dto/RetrievedChunk.java`
+
+**修改文件**：
+- `LovespaceAiProperties.java`：新增 `Embedding.Cache` 配置类
+- `LoveQAService.java`：集成压缩与埋点
+- `LoveQaRagBeansConfiguration.java`：注入新 Bean
+- `LoveQAController.java`：SSE 发送 `retrieved` 事件
+- `LoveQaStreamCallback.java`：新增 `onRetrieved()`
+- `application.yml`：新增 `lovespace.ai.embedding.cache.*` 配置
+- `lovespace-ai/pom.xml`：添加 `commons-codec` 依赖
+- `lovespace-frontend/src/services/loveQa.ts`：处理 `retrieved` 事件
+- `lovespace-frontend/src/pages/AILoveQA.tsx`：展示引用卡片
+
+**文档更新**：`memory/love-qa-rag.md`、`memory/decisions.md`、`memory/progress.md` 已同步。

@@ -14,6 +14,7 @@
 | 产品与技术目标、范围 | [goals.md](./goals.md) |
 | Docker、nginx、MinIO、构建与 403 等问题 | [DEPLOYMENT.md](./DEPLOYMENT.md) |
 | 恋爱问答 RAG、Milvus、前后端路径与注意点 | [love-qa-rag.md](./love-qa-rag.md) |
+| RAG 优化专项（Embedding 缓存、Prompt 压缩、Latency 埋点、检索可视化） | [RAG_OPTIMIZATION.md](./RAG_OPTIMIZATION.md) |
 
 ## 文件一览（一句话）
 
@@ -27,7 +28,8 @@
 | **blockers.md** | 障碍与依赖：JDK/MySQL/Redis 脚本、注意事项 |
 | **goals.md** | 最终目标与拆解 |
 | **DEPLOYMENT.md** | 容器化部署（含 **Milvus/etcd**、与业务 **共用 MinIO**、后端 fat jar 构建说明）、MinIO 公网 URL 与桶策略 |
-| **love-qa-rag.md** | 恋爱知识库 RAG：`lovespace-ai`（含 RAG）默认打入 user、**DashScope 嵌入** + Milvus、集合启动自检；含 **多轮记忆（多消息 LLM + Redis/MySQL 回填）**、**SSE 流式 `/chat/stream`**、前端页布局与滚动约定 |
+| **love-qa-rag.md** | 恋爱知识库 RAG：`lovespace-ai`（含 RAG）默认打入 user、**DashScope 嵌入** + Milvus、集合启动自检；含 **多轮记忆（多消息 LLM + Redis/MySQL 回填）**、**SSE 流式 `/chat/stream`**、前端页布局与滚动约定；**2026-05 新增**：Embedding 缓存（Redis）、Prompt 压缩（去重+截断）、Latency 埋点（6 阶段计时）、检索可视化（SSE `retrieved` 事件） |
+| **RAG_OPTIMIZATION.md** | **2026-05 新增**：RAG 模块四项优化详解——Embedding 缓存、Prompt 压缩、Latency 埋点、检索可视化的设计决策、实现要点与预期收益 |
 
 ## 建议加载顺序（典型任务）
 
@@ -36,6 +38,7 @@
 3. **改前端页面或 API 调用**：`CODING_RULES.md`（请求/超时/状态）→ `PROJECT_STRUCTURE.md`（路由与服务文件位置）。
 4. **部署或线上资源 URL**：`DEPLOYMENT.md` → `blockers.md`（MinIO/代理）。
 5. **恋爱问答 / Milvus RAG**：`love-qa-rag.md` → 必要时 `PROJECT_STRUCTURE.md`（路径）与 `lovespace-user` 的 `application.yml`。
+6. **RAG 优化专项（缓存/压缩/埋点/可视化）**：`RAG_OPTIMIZATION.md`（详细设计）→ `love-qa-rag.md`（接口与配置）→ `decisions.md`（架构决策）。
 
 ## 与 Cursor 的配合
 
