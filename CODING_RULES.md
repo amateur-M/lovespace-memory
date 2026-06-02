@@ -22,6 +22,7 @@
 - **状态**：认证、情侣等跨页状态用 Zustand；局部列表用组件内 useState/useCallback；`authStore` 使用 `authHydrated`，在 `AppLayout` 完成 hydrate 后再挂载 `Outlet`
 - **样式**：入口 `StyleProvider hashPriority="high"`；`prefers-reduced-motion` 勿对全局 `*` 施加会破坏 body 上浮层动画的规则
 - **纪念日照片墙**：相册 URL 经 `utils/mediaUrl.resolveMediaUrl`；大图预览使用 Ant Design `Image` 的 `preview`（列表与预览 URL 区分见 `decisions.md`「纪念日页面」）
+- **头像与静态资源**：后端返回的相对路径（含 `/local-files/**` 头像）展示前须经 `resolveMediaUrl`（`AppLayout`、`Profile`、`CoupleCard`、`Chat`、`Inbox` 等 Avatar 已统一）
 
 ## 注释规范
 

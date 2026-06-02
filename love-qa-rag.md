@@ -97,7 +97,11 @@ mvn -pl lovespace-user -am package -DskipTests
 - 路由 **`/love-qa`**；页面 **`lovespace-frontend/src/pages/AILoveQA.tsx`**；API **`services/loveQa.ts`**。
 - **主路径**：**`postLoveQaChatStream`**（`fetch` + `ReadableStream`，解析 **`meta` / `retrieved` / `delta` / `done` / `error`**；`AbortController` 120s；`VITE_SESSION_DISTRIBUTED` 时 `credentials: 'include'` 与 axios 一致）。**`postLoveQaChat`** 仍保留为非流式兼容。
 - **布局（千问式 + 全站玫瑰色）**：大屏 **侧栏**（新建对话、最近会话列表、刷新）+ **主区**；空状态居中问候 + 大圆角输入区；有消息时 **消息区可滚动**、底部输入区 **`shrink-0`**。根容器 **`h-[calc(100dvh-11rem)]`** 等，避免长对话撑开整页；**`useLayoutEffect`** 在**切换会话**时瞬间滚到底、同会话内新消息平滑滚动。
-- **检索可视化**：`AILoveQA.tsx` 在 assistant 消息上方展示引用来源卡片 `📚 参考了 X 条知识：来源1、来源2...`，提升用户信任度与可溯源性。
+- **检索可视化**：`AILoveQA.tsx` 在 assistant 消息内展示：
+  - 摘要行 `📚 参考了 X 条知识`（可选列出前 3 个 source）
+  - **来源卡片列表**：每条含 `[n]`、source、textPreview；DOM `id="source-{messageKey}-{idx}"`（同页多消息不冲突）
+  - 正文中的 `【n】` / `[n]` 可点击，滚动至对应卡片并 **短暂高亮**（rose 边框/背景）
+  - SSE `onRetrieved` 写入 `UiMessage.retrievedChunks`；`ingestMode` Tab 切换用类型守卫（无 `any`）
 
 ---
 

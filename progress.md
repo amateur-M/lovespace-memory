@@ -19,7 +19,7 @@
 - **本机静态资源**：`/local-files/`** 由 `LocalFileRangeController` 提供，支持 Accept-Ranges 与 206 Partial Content（利于视频拖拽进度）；已移除仅 ResourceHandlerRegistry 的 file 映射
 - **公共分片上传**：`ChunkedMediaUploadService` + `/api/v1/media/uploads`（init / PUT .../chunks/{i} / status / complete / DELETE）；暂存 `_pending/media/{uuid}/`，定时任务清理超时会话；兼容旧路径 `_pending/timeline/` 的未完成会话
 - **私密消息**：Spring Security 放行 `/ws/`** 握手；JWT 在 JwtAuthenticationFilter 中对 WebSocket 路径跳过（避免无 Authorization 头导致握手失败）；浏览器端通过 `?token=` 传 JWT，握手后在 ChatWebSocketHandler 内校验
-- **聊天页前端**：关闭轮询，以 WebSocket 实时增量为主；历史首屏仍用 GET /api/v1/messages。WS 已连接时即时/定时仍走 WS JSON（send / scheduled）；**WS 未就绪时回退 REST**（`POST /api/v1/messages/send`、`POST /scheduled`），返回体 `upsertMessage` 去重。WebSocket `useEffect` 依赖 `**partner?.id`**，避免 `partner` 对象引用抖动导致反复断连
+- **聊天页前端**：关闭轮询，以 WebSocket 实时增量为主；历史首屏仍用 GET /api/v1/messages。WS 已连接时即时/定时仍走 WS JSON（send / scheduled）；**WS 未就绪时回退 REST**（`POST /api/v1/messages/send`、`POST /scheduled`），返回体 `upsertMessage` 去重。WebSocket `useEffect` 依赖 **`partner`**（与 effect 内 `!partner` 守卫一致）
 - **可选分布式 Session（Redis）**：`spring-session-data-redis`；`lovespace.session.distributed.enabled` 默认 false；启用时需 `spring.session.store-type=redis` 与可用 Redis。登录写入 Spring Security 上下文至 Session（AuthController + HttpSessionSecurityContextRepository），登出 invalidate Session。JwtAuthenticationFilter：Bearer 过期/无效时若已启用分布式 Session则不直接 401，以便回退 Session Cookie；黑名单仍 401。DistributedSessionCorsConfig：启用分布式 Session 时注册带凭证 CORS（直连 API 跨域时需要）。Cookie 名 LOVESPACE_SESSION
 - **前端认证**：authStore 增加 authHydrated；AppLayout 在 hydration 完成前不渲染 Outlet（避免刷新时 isAuthed 尚未从 localStorage 恢复即触发 Navigate → /login）。VITE_SESSION_DISTRIBUTED=true 时 http withCredentials；hydrate 无 JWT 时可 getProfile 依赖 Session
 - **前端全局样式**：@ant-design/cssinjs StyleProvider hashPriority="high"（与 Tailwind 共存）；index.css 将 prefers-reduced-motion 限定在 #root *，避免破坏挂到 body 的 Ant Design 浮层；ConfigProvider getPopupContainer={() => document.body}；主题 zIndexPopupBase: 1050
@@ -123,8 +123,8 @@
 ### 路由（App.tsx）
 
 - /login、/register（AuthPageShell 暖色渐变背景）
-- / 首页、/profile 个人资料、/couple 情侣首页、/inbox 消息（待处理情侣邀请）、/timeline 时间轴、/album 相册、/chat 私密消息、/plan 共同计划、**/memorial 纪念日**、/emotion 情感洞察、/love-letter AI 情书
-- - → 404
+- / 首页、/profile 个人资料、/couple 情侣首页、/inbox 消息（待处理情侣邀请）、/timeline 时间轴、/album 相册、/chat 私密消息、/plan 共同计划、**/memorial 纪念日**、/emotion 情感洞察、**/love-qa 恋爱问答**、/love-letter AI 情书
+- * → 404
 
 ### 状态与服务
 
@@ -139,13 +139,14 @@
 - services/emotion.ts — getEmotionReport（GET /api/v1/ai/emotion，超时 120s；可选 **AbortSignal** 供页面取消 StrictMode / 快速切换日期时的重复请求）
 - services/loveLetter.ts — generateLoveLetter（POST /api/v1/ai/love-letter，超时 120s）
 - services/memorial.ts — 纪念日 CRUD、getNextMemorial、listUpcomingMemorials（与后端 /api/v1/memorial-days 对齐）
+- **services/loveQa.ts** — 恋爱问答 RAG：`postLoveQaChatStream`（SSE）、`postLoveQaIngest*`、会话历史；`RetrievedChunk` 类型；超时 ≥120s
 - memorialStore（Zustand）— 列表、nextPayload、countdownAnchor（轮询与本地秒级倒计时对齐）、invalidate
 
 ### UI 与主题
 
 - src/theme/antdTheme.ts + App.tsx ConfigProvider：locale=zhCN，暖色 token
 - index.css：ls-surface、ls-page-intro、ls-link；Inter 字体
-- 顶栏：AppLayout 含「私密消息」「共同计划」「**纪念日**」「情感洞察」「AI情书」等入口
+- 顶栏：AppLayout 含「私密消息」「共同计划」「**纪念日**」「情感洞察」「**恋爱问答**」「AI情书」等入口
 
 ### 页面与组件摘要
 
@@ -154,14 +155,15 @@
 - **情侣**：CoupleHome（邀请弹窗输入对方 **手机号**；Hero、「一起去看看」快捷链、底部弱化解除关系）、CoupleCard、DaysCounter
 - **相册**：Album.tsx（uploadAlbumPhotoAuto；saveAlbumName；进入相册后 Pagination（PHOTO_PAGE_SIZE，当前前端常量多为 12；后端单页上限仍为 100）；上传成功后回到第 1 页并刷新）；AlbumCard（仅封面进入；双击名称内联编辑、回车保存、Esc 取消）；PhotoGrid、PhotoViewer（灯箱内编辑信息 Drawer，元数据保存后 patchPhotoMeta）、UploadButton
 - **私密消息**：Chat.tsx；MessageBubble、MessageInput、ScheduledPicker（一体化输入区、会话时间格式、滚动加载更早消息）；见上「WS + HTTP 回退」
-- **工具**：utils/mediaUrl.ts
+- **工具**：utils/mediaUrl.ts（`resolveMediaUrl` — 时间轴/相册/纪念日媒体及 **Avatar 头像** 相对路径 `/local-files/**` 均需经此拼接 `VITE_API_BASE_URL`）；utils/mood.ts（`MOOD_OPTIONS`、`moodLabel`，供 TimelineForm / 情感洞察）；utils/timelineMedia.ts、utils/planProgress.ts
 - **情感洞察**：EmotionAnalysis.tsx + EmotionAnalysisCharts.tsx（ECharts 环形图 + 折线面积图）；日期区间、仪表盘分数、AI 建议、分布列表；加载报告用 **AbortController** 避免开发环境 StrictMode 下重复请求与 loading 竞态；**EmotionAnalysisCharts** 内 **单次 effect** 同时初始化两图并统一 resize/dispose，减轻双 effect 带来的重复初始化与闪动
 - **AI 情书**：AILoveLetter.tsx — 风格/篇幅/可选回忆、生成结果与复制；表单下仅保留简短耗时提示（已去与按钮重复的 Alert）
-- **纪念日**：`Memorial.tsx` + `MemorialDayFormModal.tsx` + `components/memorial/MemorialRomanticDecor.tsx` + `MemorialPhotoWall.tsx` — 标题区（手绘标题 + 波浪线文案）；**倒计时与祝福语在照片墙之上**；照片墙从相册聚合、环绕式双环错落、**点击照片 Ant Design Image 预览放大**（mask 文案「查看」）；FloatButton 新建；折叠「全部纪念日」列表（编辑/删除）；无页内月历与标题下「新建纪念日」主按钮
+- **纪念日**：`Memorial.tsx` + `MemorialDayFormModal.tsx` + `components/memorial/MemorialRomanticDecor.tsx` + `MemorialPhotoWall.tsx` — 标题区（手绘标题 + 波浪线文案）；**倒计时与祝福语在照片墙之上**；照片墙从相册聚合、环绕式双环错落、**点击照片 Ant Design Image 预览放大**（mask 文案「查看」）；FloatButton 新建；折叠「全部纪念日」列表（编辑/删除）；无页内月历与标题下「新建纪念日」主按钮；倒计时每秒刷新（`tick` 触发重算 + `remainingMsFromAnchor` 用 `Date.now()`，无多余 `useMemo`）
+- **恋爱问答**：`AILoveQA.tsx` + `services/loveQa.ts` — 侧栏会话列表 + 主区千问式布局；SSE 流式问答；assistant 消息展示 **检索来源卡片**（摘要 + `[n]` 卡片含 source/textPreview；正文 `【n】`/`[n]` 可点击滚动高亮对应卡片，`id=source-{messageKey}-{idx}`）；知识库入库 Modal（文本/文件/URL 三 Tab）
 
 ### 验证
 
-- npm run build 已通过（以当前依赖为准）
+- `npm run build` 与 `npx eslint .` 均已通过（2026-06-02 前端代码审查修复后）
 
 ---
 
@@ -247,7 +249,7 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 
 **前端**：`Login`/`Register` 表单为手机号；`Profile` 展示只读手机号、可编辑用户名与邮箱（`updateProfile`）；`HomePage` 展示手机号与邮箱；`couple.ts` 与 `CoupleHome` 邀请走 `inviteePhone`。
 
-**个人资料页小调**：头像上传后 `Avatar` 以 `user.avatarUrl` 为准；`avatarUrl` 与 store 同步逻辑见当前 `Profile.tsx`（用户可继续迭代）。
+**个人资料页小调**：头像上传后 `Avatar` 以 `user.avatarUrl` 为准，展示时经 **`resolveMediaUrl`**；`avatarUrl` 与 store 同步逻辑见当前 `Profile.tsx`。
 
 ### 恋爱问答 RAG、Milvus 与通义嵌入（接续）
 
@@ -286,7 +288,7 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 
 **前端**：
 - `services/loveQa.ts`：新增 `RetrievedChunk` 类型，`LoveQaChatStreamHandlers` 新增 `onRetrieved` 回调，SSE 解析处理 `retrieved` 事件。
-- `AILoveQA.tsx`：消息类型扩展 `retrievedChunks`，`onSend` 中处理 `onRetrieved`，UI 展示引用来源卡片 `📚 参考了 X 条知识：来源1、来源2...`。
+- `AILoveQA.tsx`：消息类型扩展 `retrievedChunks`，`onSend` 中处理 `onRetrieved`；UI 展示引用摘要与来源卡片（**2026-06 补全**：可点击引用、卡片高亮、修复 build 阻断）。
 
 **新增文件**（ lovespace-backend/lovespace-ai ）：
 - `embedding/cache/CachedEmbeddingModel.java`
@@ -314,3 +316,31 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 - `lovespace-frontend/src/pages/AILoveQA.tsx`：展示引用卡片
 
 **文档更新**：`memory/love-qa-rag.md`、`memory/decisions.md`、`memory/progress.md` 已同步。
+
+### 前端代码审查与修复（任务 62，2026-06-02）
+
+**背景**：全量检查 `lovespace-frontend` 发现 `npm run build` 失败（`AILoveQA.tsx` 未使用变量）、RAG 检索可视化半成品、头像未走 `resolveMediaUrl`、ESLint 6 errors + 大量 Prettier warning。
+
+**修复**：
+
+1. **AILoveQA 检索可视化补全**
+   - assistant 消息上方：摘要「📚 参考了 X 条知识」+ 逐条来源卡片（`[n]`、source、textPreview）
+   - 正文 `【n】`/`[n]` 可点击，滚动至 `id="source-{messageKey}-{idx}"` 并短暂高亮
+   - 修复 TS/ESLint：`ingestMode` 类型守卫（去掉 `as any`）、引用正则
+
+2. **头像 URL**
+   - `AppLayout`、`Profile`、`CoupleCard`、`Chat`、`Inbox` 的 `Avatar` 统一 `resolveMediaUrl(avatarUrl)`
+
+3. **结构与依赖清理**
+   - 新增 `utils/mood.ts`（`MOOD_OPTIONS`、`moodLabel` 从 `MoodTag.tsx` 拆出，消除 Fast Refresh ESLint error）
+   - 删除死代码 `stores/useAppStore.ts`、演示组件 `EChartsDemo.tsx`（首页已移除引用）
+   - `package.json` 显式依赖 `dayjs`
+
+4. **Lint 与 hooks**
+   - `eslint . --fix` 修复 Prettier 格式
+   - `Chat.tsx`：WebSocket effect 依赖改为 `partner`
+   - `Memorial.tsx`：倒计时去掉多余 `useMemo`，`void tick` + 每帧 `remainingMsFromAnchor`
+
+**验证**：`npx eslint .` → 0 errors / 0 warnings；`npm run build` → 通过。
+
+**文档**：`memory/progress.md`（本段）、`memory/love-qa-rag.md`、`memory/PROJECT_STRUCTURE.md`、`memory/CODING_RULES.md`、`memory/RAG_OPTIMIZATION.md` 已同步。

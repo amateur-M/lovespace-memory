@@ -183,7 +183,11 @@ LoveQAController SSE 发送 event: retrieved
 
 - **`RetrievedChunk`**：DTO，含片段预览、相似度分数、来源信息
 - **`LoveQaStreamCallback.onRetrieved()`**：新增回调方法（默认空实现，向后兼容）
-- **前端 `AILoveQA.tsx`**：消息卡片上方展示 `📚 参考了 X 条知识：来源1、来源2...`
+- **前端 `AILoveQA.tsx`**：
+  - 摘要：`📚 参考了 X 条知识`（可选来源名）
+  - 卡片：`[n]` + source + textPreview，`id=source-{messageKey}-{idx}`
+  - 正文引用 `【n】`/`[n]` 可点击滚动并高亮对应卡片
+- **常量拆分**：心情枚举与 `moodLabel` 在 `utils/mood.ts`（`MoodTag.tsx` 仅导出组件，满足 Fast Refresh 规则）
 
 ### 4.4 SSE 事件流（增强）
 
@@ -200,11 +204,20 @@ LoveQAController SSE 发送 event: retrieved
 ```
 ┌─────────────────────────────────────────┐
 │  📚 参考了 3 条知识：情感沟通、道歉技巧  │
+│  ┌───────────────────────────────────┐  │
+│  │ [1] 情感沟通                       │  │
+│  │ 保持冷静，先倾听对方感受...         │  │
+│  └───────────────────────────────────┘  │
+│  ┌───────────────────────────────────┐  │
+│  │ [2] 道歉技巧  ...                  │  │
+│  └───────────────────────────────────┘  │
 │  ─────────────────────────────────────  │
-│  首先，保持冷静，不要争辩...             │
-│  （继续生成中...）                       │
+│  根据【1】【2】，建议你先...            │
+│  （继续流式生成中...）                   │
 └─────────────────────────────────────────┘
 ```
+
+点击正文 `【1】` 滚动至对应卡片并短暂高亮。
 
 ---
 
@@ -243,7 +256,8 @@ LoveQAController SSE 发送 event: retrieved
 | 文件 | 类型 | 说明 |
 |------|------|------|
 | `services/loveQa.ts` | 修改 | 新增 RetrievedChunk 类型，处理 retrieved 事件 |
-| `pages/AILoveQA.tsx` | 修改 | 展示引用来源卡片 |
+| `pages/AILoveQA.tsx` | 修改 | 检索摘要 + 来源卡片 + 可点击引用 |
+| `utils/mood.ts` | 新增 | 心情常量与 `moodLabel`（自 MoodTag 拆出） |
 
 ---
 
@@ -252,7 +266,7 @@ LoveQAController SSE 发送 event: retrieved
 - [ ] Embedding 缓存：重复 query 第二次响应时间 < 10ms
 - [ ] Embedding 缓存：Redis 中存在 `lovespace:embedding:v1:*` key
 - [ ] Latency 埋点：DEBUG 日志输出各阶段耗时
-- [ ] 检索可视化：前端展示 "📚 参考了 X 条知识"
+- [x] 检索可视化：前端展示摘要 + 来源卡片 + 可点击引用（2026-06-02 补全，见 `progress.md` 任务 62）
 - [ ] Prompt 压缩：检索片段数去重后减少（如有重复）
 
 ---
@@ -272,4 +286,4 @@ LoveQAController SSE 发送 event: retrieved
 **文档关联**：
 - 详细设计见 [love-qa-rag.md](./love-qa-rag.md)
 - 架构决策见 [decisions.md](./decisions.md) 第 3 条
-- 进度记录见 [progress.md](./progress.md) 任务 61
+- 进度记录见 [progress.md](./progress.md) 任务 61、**62**

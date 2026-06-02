@@ -42,19 +42,19 @@ meng-lovespace/
     ├── Dockerfile                   # nginx 提供 dist + nginx.conf
     ├── nginx.conf                   # 生产：反代 /api、/local-files、/ws → backend
     ├── package.json
-    ├── vite.config.ts               # 代理 /api、/local-files → 8081
+    ├── vite.config.ts               # 代理 /api、/local-files、/ws → 8081
     └── src/
         ├── main.tsx                 # StyleProvider hashPriority；BrowserRouter
         ├── App.tsx                  # 路由配置
         ├── theme/antdTheme.ts       # Ant Design 暖色主题
         ├── index.css                # 全局样式与工具类
         ├── layouts/AppLayout.tsx    # 导航布局；authHydrated 前加载态
-        ├── pages/                   # HomePage、Login、Register、Profile、CoupleHome、Inbox、Timeline、Album、Chat、Plan、EmotionAnalysis、AILoveLetter、Memorial
-        ├── components/              # 复用组件（AuthPageShell、TimelineItem、AlbumCard、MessageBubble、PlanListItem 等）
+        ├── pages/                   # HomePage、Login、Register、Profile、CoupleHome、Inbox、Timeline、Album、Chat、Plan、EmotionAnalysis、AILoveLetter、**AILoveQA**、Memorial
+        ├── components/              # 复用组件（AuthPageShell、TimelineItem、AlbumCard、MessageBubble、PlanListItem、MoodTag 等）
         │   └── memorial/            # 纪念日：MemorialRomanticDecor（装饰）、MemorialPhotoWall（相册环绕照片墙 + Image 预览）
-        ├── services/                # API 封装（http、auth、couple、timeline、mediaChunkUpload、album、plan、emotion、loveLetter、memorial）
-        ├── stores/                  # Zustand（authStore、inboxStore、memorialStore）
-        └── utils/                   # 工具函数（mediaUrl、timelineMedia、planProgress）
+        ├── services/                # API 封装（http、auth、couple、timeline、mediaChunkUpload、album、plan、emotion、loveLetter、**loveQa**、memorial）
+        ├── stores/                  # Zustand（authStore、coupleStore、inboxStore、memorialStore）
+        └── utils/                   # 工具函数（mediaUrl、**mood**、timelineMedia、planProgress）
 ```
 
 ## 后端 API 速查（前缀 `/api/v1`）
@@ -93,6 +93,7 @@ meng-lovespace/
 | **`/plan`** | **共同计划** |
 | **`/emotion`** | **情感洞察**（AI 分析） |
 | **`/love-letter`** | **AI 情书** |
+| **`/love-qa`** | **恋爱问答**（RAG + SSE 流式；`AILoveQA.tsx`） |
 | **`/memorial`** | **纪念日**（`Memorial.tsx`：倒计时在上、相册环绕照片墙、FloatButton 新建、折叠列表管理） |
 
 ## 快速恢复上下文
