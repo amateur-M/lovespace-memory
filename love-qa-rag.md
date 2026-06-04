@@ -127,3 +127,5 @@ mvn -pl lovespace-user -am package -DskipTests
 ---
 
 文档随实现迭代更新；架构总览见 `memory/decisions.md`，部署见 `memory/DEPLOYMENT.md`。
+
+**后续优化计划**（分阶段：摄入 → 召回/重排 → 韧性 → 观测/评测）：见 [RAG_PHASED_OPTIMIZATION.md](./RAG_PHASED_OPTIMIZATION.md)。已落地优化（2026-05）见 [RAG_OPTIMIZATION.md](./RAG_OPTIMIZATION.md)。

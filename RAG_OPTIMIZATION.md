@@ -285,5 +285,6 @@ LoveQAController SSE 发送 event: retrieved
 
 **文档关联**：
 - 详细设计见 [love-qa-rag.md](./love-qa-rag.md)
+- **后续分阶段优化计划**（2026-06）见 [RAG_PHASED_OPTIMIZATION.md](./RAG_PHASED_OPTIMIZATION.md)
 - 架构决策见 [decisions.md](./decisions.md) 第 3 条
 - 进度记录见 [progress.md](./progress.md) 任务 61、**62**
