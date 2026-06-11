@@ -48,7 +48,11 @@ mvn -pl lovespace-user -am package -DskipTests
 
 ## 5. API（用户服务）
 
-- **`POST /api/v1/ai/love-qa/ingest`**：知识库入库（需登录；依赖 Milvus + `EmbeddingModel` + Redis）。
+- **`POST /api/v1/ai/love-qa/ingest`**、**`/ingest/file`**、**`/ingest/url`**：知识库入库（台账 + Milvus）；**默认异步入库**（`async-ingest: true`）立即返回 `{ documentId, status: PENDING, chunkCount: 0 }`，后台 `@Async` 分片入库；`GET .../documents/{id}` 轮询状态。URL：`LoveQaUrlFetchService`（Jsoup + SSRF）；文件：`.txt/.md`、UTF-8、≤5MB。去重：`document-dedupe-strategy` 为 `REJECT`（40994）或 `UPDATE`（覆写同 documentId）。
+- **`GET /api/v1/ai/love-qa/documents`**：文档台账分页（可选 `coupleId` 过滤；默认按 `ownerUserId`）。
+- **`GET /api/v1/ai/love-qa/documents/{id}`**：文档详情（含 `chunkCount`、`status`、`errorMessage`）。
+- **`DELETE /api/v1/ai/love-qa/documents/{id}`**：删 Milvus 向量（`metadata.documentId` filter）+ 删台账。
+- **`POST /api/v1/ai/love-qa/documents/{id}/reingest`**：删旧向量后按台账 `content` 快照重入库。
 - **`POST /api/v1/ai/love-qa/chat`**：多轮问答，**非流式**，`ApiResponse<LoveQaChatResponseData>`（前端 `http` timeout ≥ 120s 仍可用作兼容）。
 - **`POST /api/v1/ai/love-qa/chat/stream`**：**流式 SSE**，`Content-Type: text/event-stream`；`LoveQAController` 在**虚拟线程**中调用 **`LoveQaChatFacade.chatStream`**；SSE **事件名**与 JSON **字符串**载荷：
   - **`meta`**：`{"conversationId":"..."}`（首轮即下发，新会话在此拿到 UUID）

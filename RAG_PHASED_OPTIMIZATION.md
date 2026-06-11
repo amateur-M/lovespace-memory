@@ -72,11 +72,11 @@
 
 **阶段完成定义（DoD）**：
 
-- [ ] 有文档台账，支持 list / delete / re-ingest
-- [ ] `coupleId` 写入与权限校验闭环
-- [ ] URL/文件质量可控，文档级去重生效
-- [ ] 入库异步化 + 状态可查
-- [ ] 失败可补偿，不产生「半入库脏向量」
+- [x] 有文档台账，支持 list / delete / re-ingest
+- [x] `coupleId` 写入与权限校验闭环（Sprint 1：`LoveQaIngestValidator`、默认关闭 GLOBAL、`allow-global-ingest` 配置、前端未绑定禁用入库）
+- [x] URL/文件质量可控，文档级去重生效（Sprint 2：Jsoup + SSRF、`LoveQaIngestFileValidator`、`LoveQaDocumentDedupeService`）
+- [x] 入库异步化 + 状态可查（Sprint 2：`async-ingest`、`LoveQaDocumentIngestAsyncService`、启动恢复、前端轮询）
+- [x] 失败可补偿，不产生「半入库脏向量」（P1-A 已具备；异步路径复用 `LoveQaDocumentProcessor`）
 
 ---
 
@@ -735,4 +735,96 @@ Sprint 7  ─ 灰度 + 在线采样 + 看板
 - API 变更同步 [love-qa-rag.md](./love-qa-rag.md) 与 [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)
 - 本文件版本：在文首记录 `最后更新：YYYY-MM-DD` 与已完成 Sprint 勾选
 
-**最后更新：2026-06-04**
+---
+
+## 9. 会话接续 checklist
+
+新开 Cursor 窗口继续 RAG 优化时，按本节操作即可恢复上下文，**不必**重读整个 `memory/` 或全仓代码。
+
+### 9.1 开场：文档加载顺序
+
+| 顺序 | 文档 | 用途 |
+|------|------|------|
+| ① | [INDEX.md](./INDEX.md) | 确认路由表 |
+| ② | **本文件** `RAG_PHASED_OPTIMIZATION.md` | 阶段计划、Sprint、DoD、任务拆解 |
+| ③ | [progress.md](./progress.md) | 「对话任务摘要」：上次进度与阻塞 |
+| ④ | [love-qa-rag.md](./love-qa-rag.md) | 当前实现、API、Bean（**改代码时**再读） |
+| ⑤ | [RAG_OPTIMIZATION.md](./RAG_OPTIMIZATION.md) | 仅当改动 2026-05 已落地项（缓存/压缩/埋点/可视化） |
+| ⑥ | [decisions.md](./decisions.md) | 改表、filter、隔离策略时 |
+| ⑦ | [DEPLOYMENT.md](./DEPLOYMENT.md) | 联调 Milvus / DashScope / nginx SSE 时 |
+
+**原则**：计划看本文件，现状看 `love-qa-rag.md`，进度看 `progress.md`。
+
+### 9.2 开场：可复制提示词
+
+将下面模板粘贴为新会话**第一条消息**，并替换 `[...]`：
+
+```text
+你是 LoveSpace 全栈开发助手，继续 RAG 优化工作。
+
+请先读：
+1. memory/INDEX.md（路由）
+2. memory/RAG_PHASED_OPTIMIZATION.md（分阶段计划）
+3. memory/progress.md（最近任务摘要）
+
+当前进度：
+- 阶段：[1 摄入 / 2 召回 / 3 韧性 / 4 观测]
+- Sprint：[如 Sprint 1]
+- 任务：[如 P1-A 文档台账]
+- 上次状态：[未开始 / 进行中 / 已完成 / blocked 及原因]
+
+本次目标：[具体要完成的一件事]
+
+约束：
+- 遵守 .cursor/rules/lovespace-coding-standards.mdc
+- 按 RAG_PHASED_OPTIMIZATION 阶段顺序，不跳阶段
+- 重大变更同步 memory/decisions.md 与 progress.md
+- 未明确要求不要 git commit
+
+读完上述文档后，先简要复述当前阶段 DoD 与本次任务，再开始实现。
+```
+
+### 9.3 按任务类型 @ 代码文件
+
+| 本次要做的事 | 建议 @ 或让 Agent 打开 |
+|--------------|-------------------------|
+| 改入库 | `LoveQAController.java`、`DocumentIngestPipeline.java` |
+| 改检索 / Prompt | `LoveQAService.java`、`PromptCompressor.java` |
+| 改缓存 / 指标 | `CachedEmbeddingModel.java`、`RagMetricsCollector.java` |
+| 改前端问答页 | `lovespace-frontend/src/pages/AILoveQA.tsx`、`services/loveQa.ts` |
+| 改配置 | `lovespace-user/src/main/resources/application.yml` |
+| 新建 SQL | `lovespace-user/src/main/resources/sql/` + `memory/blockers.md` |
+
+### 9.4 收工：写回 memory（供下次接续）
+
+**A. 更新 [progress.md](./progress.md)** — 在「对话任务摘要」追加或修订：
+
+```markdown
+### RAG 分阶段优化（YYYY-MM-DD 起）
+- **计划文档**：memory/RAG_PHASED_OPTIMIZATION.md
+- **当前**：阶段 N / Sprint M / 任务 Px-y
+- **已完成**：…
+- **进行中**：…
+- **阻塞**：…
+- **下次**：…
+```
+
+**B. 更新本文件** — 勾选对应阶段 DoD / Sprint 项；更新下方「最后更新」日期。
+
+**C. 若变更表结构、filter、降级策略** — 同步 [decisions.md](./decisions.md)；API 变更同步 [love-qa-rag.md](./love-qa-rag.md)。
+
+### 9.5 默认起点（尚未开工时）
+
+若 `progress.md` 尚无 RAG 分阶段条目，默认从：
+
+- **阶段 1 → Sprint 1 → P1-A**：MySQL 文档台账 + `coupleId` 服务端校验 + list/delete API
+
+### 9.6 不必重复做的事
+
+- 不必让 Agent 一次性加载全部 `memory/` 文档
+- 不必重讲 Milvus + DashScope + SSE 基础（见 `love-qa-rag.md`）
+- 不必重审 2026-05 四项已落地优化，除非修改对应实现文件
+
+---
+
+**最后更新：2026-06-11**（Sprint 2 完成：P1-C/D + 前端知识库 Tab；阶段 1 DoD 五项均已勾选）

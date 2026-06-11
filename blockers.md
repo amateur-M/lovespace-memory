@@ -7,7 +7,7 @@
 ## 环境依赖
 
 1. **JDK**：Maven 编译/运行需 Java 21（避免 `mvn -v` 仍指向旧 JDK）
-2. **MySQL**：库表需按 `sql/` 脚本初始化；若库早于 `images_json` 字段，需执行 `love_records_add_images_json.sql`；时间轴点赞/评论需执行 `love_record_social.sql`；相册需执行 `couple_albums.sql`；私密消息需执行 `private_messages.sql`；共同计划需执行 `couple_plans.sql`；若需计划消费流水与预算汇总，另执行 `plan_expenses.sql`；纪念日需执行 `memorial_days.sql`。**若 `users` 表尚无 `phone` 列（早于手机号账号改造）**，需执行 `users_add_phone_account.sql` 并核对占位手机号或改为真实号码后再约束 NOT NULL
+2. **MySQL**：库表需按 `sql/` 脚本初始化；若库早于 `images_json` 字段，需执行 `love_records_add_images_json.sql`；时间轴点赞/评论需执行 `love_record_social.sql`；相册需执行 `couple_albums.sql`；私密消息需执行 `private_messages.sql`；共同计划需执行 `couple_plans.sql`；若需计划消费流水与预算汇总，另执行 `plan_expenses.sql`；纪念日需执行 `memorial_days.sql`；恋爱问答历史需执行 `love_qa.sql`；**RAG 文档台账**需执行 `love_qa_documents.sql`。**若 `users` 表尚无 `phone` 列（早于手机号账号改造）**，需执行 `users_add_phone_account.sql` 并核对占位手机号或改为真实号码后再约束 NOT NULL
 3. **Redis**：登出黑名单依赖；不可用则相关接口可能异常。可选分布式 Session 亦依赖 Redis（`spring.session.store-type=redis`）；未启用时保持 `store-type: none`，勿误开 `lovespace.session.distributed.enabled` 而无 Redis Session 配置
 
 ## 已知注意事项（非阻塞）

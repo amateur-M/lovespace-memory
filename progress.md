@@ -56,6 +56,7 @@
 - plan_expenses.sql — plan_expenses（计划消费：expense_type 为 lodging|transport|dining|other；plan_id 外键级联删除）
 - memorial_days.sql — memorial_days（纪念日：couple_id、user_id、name、memorial_date 等）
 - love_qa.sql — love_qa_conversations、love_qa_messages（恋爱问答会话与消息持久化）
+- love_qa_documents.sql — love_qa_documents（恋爱知识库文档台账：状态、chunkCount、content 快照）
 
 ### 主要 API 分组
 
@@ -92,7 +93,8 @@
   - POST /ai/chat — body AiChatRequest（message），返回 AiChatResponseData（reply）；路由 lovespace.ai.provider：qwen | openai。
   - GET /ai/emotion?coupleId&startDate&endDate — EmotionAnalysisController；EmotionAnalysisReport：overallMood、moodScore、emotionDistribution、trendData、insights；统计来自 LoveRecordService.listVisibleRecordsInRange + 通义 JSON 解析；区间默认近 30 天、最长 366 天；TimelineControllerExceptionHandler 已包含 EmotionAnalysisController。
   - POST /ai/love-letter — body LoveLetterGenerateRequest（coupleId、style、length、memories 可选）；LoveLetterService 填充发送方/接收方/恋爱天数，回忆可选手写或由近 1 年记录摘要；LoveLetterControllerExceptionHandler。
-  - POST /ai/love-qa/ingest — LoveQaIngestRequest（text、title、metadata 可选）；`LoveQAService.ingestDocument`；仅当存在 Spring AI `VectorStore`（Milvus + `EmbeddingModel`）时注册 `LoveQAController`。
+  - POST /ai/love-qa/ingest|ingest/file|ingest/url — 写 MySQL 台账 + Milvus；返回 `LoveQaIngestResponseData`（documentId、status、chunkCount）；`LoveQaDocumentService` + `LoveQAService.ingestDocumentWithTracking`。
+  - GET /ai/love-qa/documents — 文档台账分页（可选 coupleId）；GET /documents/{id} 详情；DELETE /documents/{id} 删向量+台账；POST /documents/{id}/reingest 重入库。
   - POST /ai/love-qa/chat — LoveQaChatRequest（message、可选 conversationId、coupleId）；**非流式** `ApiResponse`；Redis 多轮（`lovespace:love-qa:conv:*`）；每轮成功后 **MySQL** `appendChatRound`；检索 Milvus 后 RAG；前端 `http` timeout ≥120s 仍可用。
   - POST /ai/love-qa/chat/stream — **SSE**（`text/event-stream`）；事件 **meta**（conversationId）/ **delta**（增量 `t`）/ **done**（reply + conversationId）/ **error**；`LoveQaChatFacade.chatStream` + 虚拟线程；流结束后 **MySQL appendChatRound**；主站前端 `**postLoveQaChatStream`**（`fetch` + ReadableStream）实时拼 assistant。
   - **会话**：`/chat` 与 `/chat/stream` 在带 `conversationId` 时先 `**restoreRedisSessionIfMissing`**（Redis 无则从 MySQL 恢复轮次）。LLM 走 `**chatWithSystemAndHistory(Streaming)**`（多消息 + system 上下文）。
@@ -344,3 +346,14 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 **验证**：`npx eslint .` → 0 errors / 0 warnings；`npm run build` → 通过。
 
 **文档**：`memory/progress.md`（本段）、`memory/love-qa-rag.md`、`memory/PROJECT_STRUCTURE.md`、`memory/CODING_RULES.md`、`memory/RAG_OPTIMIZATION.md` 已同步。
+
+### RAG 分阶段优化（2026-06-11 起）
+
+- **计划文档**：memory/RAG_PHASED_OPTIMIZATION.md
+- **当前**：阶段 1 摄入 **DoD 已完成** → 下次进入阶段 2 / Sprint 3
+- **Sprint 2 已完成**：
+  - P1-C：`LoveQaUrlFetchService`（Jsoup 正文 + SSRF/大小/超时）；`LoveQaIngestFileValidator`（.txt/.md、5MB、UTF-8）；`LoveQaDocumentDedupeService`（`content_hash`/`source_url` + coupleId，`REJECT`|`UPDATE`）
+  - P1-D：`async-ingest: true` 立即返回 PENDING；`LoveQaDocumentProcessor` + `@Async`；`LoveQaIngestRecoveryRunner` 启动重排队
+  - 前端：侧栏「对话|知识库」Tab、文档列表/删除/重试、处理中 3s 轮询、异步入库后自动切 Tab
+- **阻塞**：存量库需手动执行 `sql/love_qa_documents.sql`
+- **下次（Sprint 3）**：P2-A 检索 filter 固化 + similarity 阈值 + 0 命中拒答
