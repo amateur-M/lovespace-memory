@@ -95,6 +95,22 @@
    - **Prompt 压缩**：`PromptCompressor` 去重（Jaccard 0.85）、上下文长度限制 8000 字符、历史精简（保留最近 10 轮）；预期 Token 消耗降低 20-40%。
    - **检索可视化**：SSE 新增 `retrieved` 事件，返回 `RetrievedChunk` 列表（含 id/textPreview/score/source）；前端展示 `📚 参考了 X 条知识` 卡片，提升可溯源性。
    - **Latency 埋点**：全流程分解为 6 个阶段计时（Embedding/检索/Prompt构建/LLM首字节/LLM总耗时/持久化），DEBUG 日志输出便于性能分析。
+
+   **RAG 检索过滤（2026-06 P2-A）**：
+   - **chat 校验**：`LoveQaChatRetrievalValidator`（与入库 `LoveQaIngestValidator` 对齐）；默认未绑定情侣拒绝 chat（40093）；`coupleId` 须等于 `bindingId`（40393）。
+   - **Milvus filter**（`RagRetrievalFilterBuilder`）：已绑定且 `allow-global-fallback: true`（默认）→ `(coupleId == '{bindingId}' || scope == 'GLOBAL')`；`allow-global-fallback: false` → 仅 `coupleId == '{bindingId}'`；未绑定且 `allow-global-ingest: true` → `scope == 'GLOBAL'`。
+   - **召回参数**（`lovespace.ai.rag.*`）：`retrieve-candidate-k`（默认 16）初召回 → `similarity-threshold`（默认 0.55，COSINE distance 换算）过滤 → `retrieve-top-k`（默认 4）进 Prompt；低于阈值不进 `retrieved` SSE 与 Prompt。
+   - **0 命中**：阈值过滤后无片段时不调用 LLM，直接返回标准拒答模板。
+
+   **RAG 两阶段召回与重排（2026-06 P2-B）**：
+   - **流水线**：Milvus candidate-k → 阈值 → documentId 去重（保留最高分 chunk）→ L1 rerank → final topK。
+   - **L1 rerank**：`RagL1Reranker` = 向量相似度 + category 与 query 匹配加分 + `ingestedAt` 新近度加分；配置 `dedupe-by-document-id`、`rerank-enabled`、`rerank-category-boost`、`rerank-recency-boost`、`rerank-recency-days`。
+   - **历史引用快照**：`love_qa_messages.retrieved_chunks_json` 持久化 assistant 轮 `RetrievedChunk` 列表；`GET .../conversations/{id}/messages` 返回 `retrievedChunks`，前端切换历史会话可还原引用卡片。
+
+   **RAG 混合检索（2026-06 P2-C）**：
+   - **MySQL FULLTEXT**（ngram 索引 `title,category,content`）+ **`LoveQaKeywordRetriever`**（user 模块）按 coupleId/scope 隔离检索 SUCCESS 文档。
+   - **RRF 融合**：`RagReciprocalRankFusion` 合并 Milvus 向量 rank 与 BM25 rank；同一 `documentId` 优先保留向量 chunk。
+   - **配置**：`hybrid-retrieval-enabled`（默认 true）、`hybrid-bm25-top-k`、`hybrid-rrf-k`；FTS 失败时自动降级纯向量。
 5. **情侣旅游规划**：`POST /api/v1/ai/travel/plan`，`TravelPlannerService` 输出结构化 JSON；可选 `lovespace.ai.travel.poi-vector-search-enabled` 与 POI 向量骨架；高德 `AmapPlacesClient` 当前为占位实现
 
 ## 异常与响应

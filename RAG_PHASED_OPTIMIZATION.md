@@ -300,10 +300,10 @@ lovespace.ai.rag:
 
 **阶段 DoD**：
 
-- [ ] 过滤规则文档化且集成测试覆盖情侣隔离
-- [ ] candidate → rerank → final topK 流水线可配置
-- [ ] 低分片段被阈值拦截
-- [ ] 检索结果与前端引用、Prompt 来源列表一致
+- [x] 过滤规则文档化且集成测试覆盖情侣隔离（P2-A：`RagRetrievalFilterBuilder` + `LoveQaChatRetrievalValidator` + 单元测试）
+- [x] candidate → rerank → final topK 流水线可配置（P2-B：`RagRetrievalPipeline` + L1 rerank）
+- [x] 低分片段被阈值拦截（P2-A：`similarity-threshold` + `RagSimilarityFilter`）
+- [x] 检索结果与前端引用、Prompt 来源列表一致（含历史 `retrieved_chunks_json` 快照）
 - [ ] 具备 offline baseline（至少 50–100 条 golden）
 
 ---
@@ -330,6 +330,8 @@ lovespace.ai.rag:
 ### 2.2 任务拆解
 
 #### P2-A：检索过滤策略固化
+
+**状态**：✅ 已落地（2026-06-12）
 
 **建议 filter 表达式**（Spring AI Expression Language）：
 
@@ -369,6 +371,8 @@ lovespace.ai.rag:
 
 #### P2-B：两阶段召回（Recall → Rerank）
 
+**状态**：✅ 已落地（2026-06-12）
+
 **流水线**：
 
 ```
@@ -399,6 +403,8 @@ query embed
 
 #### P2-C：混合检索（中期）
 
+**状态**：✅ 已落地（2026-06-12）
+
 **动机**：恋爱 FAQ、专有名词（「冷战」「道歉信」）纯向量易漏召。
 
 **建议**：
@@ -427,6 +433,8 @@ query embed
 ---
 
 #### P2-E：Prompt / 前端 / 历史一致
+
+**状态**：✅ 已落地（2026-06-12，随 Sprint 4 一并完成）
 
 **问题**：MySQL 历史仅存 assistant 文本，重开对话无 `retrievedChunks`。
 
@@ -827,4 +835,4 @@ Sprint 7  ─ 灰度 + 在线采样 + 看板
 
 ---
 
-**最后更新：2026-06-11**（Sprint 2 完成：P1-C/D + 前端知识库 Tab；阶段 1 DoD 五项均已勾选）
+**最后更新：2026-06-12**（P2-C 混合检索：MySQL FULLTEXT + RRF 融合）

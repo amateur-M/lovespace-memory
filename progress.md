@@ -350,10 +350,24 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 ### RAG 分阶段优化（2026-06-11 起）
 
 - **计划文档**：memory/RAG_PHASED_OPTIMIZATION.md
-- **当前**：阶段 1 摄入 **DoD 已完成** → 下次进入阶段 2 / Sprint 3
-- **Sprint 2 已完成**：
-  - P1-C：`LoveQaUrlFetchService`（Jsoup 正文 + SSRF/大小/超时）；`LoveQaIngestFileValidator`（.txt/.md、5MB、UTF-8）；`LoveQaDocumentDedupeService`（`content_hash`/`source_url` + coupleId，`REJECT`|`UPDATE`）
-  - P1-D：`async-ingest: true` 立即返回 PENDING；`LoveQaDocumentProcessor` + `@Async`；`LoveQaIngestRecoveryRunner` 启动重排队
-  - 前端：侧栏「对话|知识库」Tab、文档列表/删除/重试、处理中 3s 轮询、异步入库后自动切 Tab
-- **阻塞**：存量库需手动执行 `sql/love_qa_documents.sql`
-- **下次（Sprint 3）**：P2-A 检索 filter 固化 + similarity 阈值 + 0 命中拒答
+- **当前**：阶段 2 召回 / **P2-C 混合检索已完成** → 下次阶段 3 韧性或 P2-D Query 增强
+- **P2-C 已完成（混合检索）**：
+  - MySQL FULLTEXT（ngram：`title` + `category` + `content`）+ `LoveQaKeywordRetriever` / `LoveQaDocumentKeywordMapper`
+  - `RagReciprocalRankFusion`：向量 rank + BM25 rank RRF 融合（`hybrid-rrf-k`）
+  - `RagRetrievalPipeline`：向量 candidate-k ∥ BM25 topK → RRF → 阈值 → dedupe → L1 rerank
+  - 配置：`hybrid-retrieval-enabled`、`hybrid-bm25-top-k`；存量库执行 `love_qa_documents_add_fulltext.sql`
+- **Sprint 4 已完成（P2-B + P2-E）**：
+  - `RagRetrievalPipeline`：candidate-k → 阈值 → `RagDocumentIdDeduplicator` → `RagL1Reranker` → final topK
+  - L1 rerank：向量分 + category 匹配加分 + ingestedAt 新近度加分（`rerank-*` 配置）
+  - 历史引用快照：`love_qa_messages.retrieved_chunks_json` + `appendChatRound` 持久化 + API/前端还原卡片
+  - 单元测试：`RagDocumentIdDeduplicatorTest`、`RagL1RerankerTest`
+- **Sprint 3 已完成（P2-A）**：
+  - `RagRetrievalFilterBuilder`：已绑定 `(coupleId == binding || scope == GLOBAL)`；未绑定且 `allow-global-ingest` 时 `scope == GLOBAL`；`allow-global-fallback: false` 时仅 coupleId 私有
+  - `LoveQaChatRetrievalValidator`：chat 侧 coupleId 校验与 filter 解析（与入库 `LoveQaIngestValidator` 对齐）
+  - `RagSimilarityFilter` + 配置 `retrieve-candidate-k` / `similarity-threshold` / `retrieve-top-k`：candidate 初召回 → 阈值过滤 → final topK
+  - 0 命中拒答：不调用 LLM，直接返回标准拒答模板；SSE 不发 `retrieved`
+  - 单元测试：`RagRetrievalFilterBuilderTest`（情侣 A/B 隔离表达式）、`RagSimilarityFilterTest`（阈值）
+  - 前端：未绑定情侣禁用提问输入 + Alert 提示
+- **Sprint 2 已完成**：P1-C/D + 前端知识库 Tab（见上文）
+- **阻塞**：存量库需 `love_qa_documents.sql`、`love_qa_messages_add_retrieved_chunks_json.sql`；**混合检索**另需 `love_qa_documents_add_fulltext.sql`（ngram FULLTEXT）
+- **下次**：阶段 3 韧性（限流 / 降级 / Embedding 缓存补全）或 P2-D Query rewrite
