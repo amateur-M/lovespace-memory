@@ -371,3 +371,11 @@ authStore：新增 authHydrated（初始 false）；hydrate() 结束或 login/lo
 - **Sprint 2 已完成**：P1-C/D + 前端知识库 Tab（见上文）
 - **阻塞**：存量库需 `love_qa_documents.sql`、`love_qa_messages_add_retrieved_chunks_json.sql`；**混合检索**另需 `love_qa_documents_add_fulltext.sql`（ngram FULLTEXT）
 - **下次**：阶段 3 韧性（限流 / 降级 / Embedding 缓存补全）或 P2-D Query rewrite
+
+### 情侣行程规划 Agent（2026-06-16 起）
+
+- **计划文档**：memory/TRAVEL_PLANNER_AGENT.md（P0–P3 任务表、DTO/API 契约、验收用例、附录）
+- **当前**：**P0 未开始** — 后端已有 `TravelPlannerService` + `POST /api/v1/ai/travel/plan`（单次 LLM）；高德 `AmapPlacesClient` 为 NoOp；POI 向量检索返回空；无天气客户端；无前端 `/travel-planner`
+- **推荐下一步**：P0-06/07 扩展 DTO/Schema → P1-01~08 天气 + 高德客户端（无 Key 可 Mock）
+- **待拍板**：天气数据源（和风 vs 高德）、首期城市列表（文档默认杭州/成都/厦门/西安/大理）
+- **阻塞**：高德 Web 服务 Key、和风天气 Key（无 Key 可用 Mock 跑通 P1 流程）

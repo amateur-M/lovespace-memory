@@ -16,6 +16,7 @@
 | 恋爱问答 RAG、Milvus、前后端路径与注意点 | [love-qa-rag.md](./love-qa-rag.md) |
 | RAG 优化专项（Embedding 缓存、Prompt 压缩、Latency 埋点、检索可视化） | [RAG_OPTIMIZATION.md](./RAG_OPTIMIZATION.md) |
 | **RAG 分阶段优化计划**（摄入→召回→韧性→观测；任务拆解与 Sprint） | [RAG_PHASED_OPTIMIZATION.md](./RAG_PHASED_OPTIMIZATION.md) |
+| **情侣行程规划 Agent**（P0–P3 实施计划、契约、验收、API） | [TRAVEL_PLANNER_AGENT.md](./TRAVEL_PLANNER_AGENT.md) |
 
 ## 文件一览（一句话）
 
@@ -32,6 +33,7 @@
 | **love-qa-rag.md** | 恋爱知识库 RAG：`lovespace-ai`（含 RAG）默认打入 user、**DashScope 嵌入** + Milvus、集合启动自检；含 **多轮记忆（多消息 LLM + Redis/MySQL 回填）**、**SSE 流式 `/chat/stream`**、前端页布局与滚动约定；**2026-05 新增**：Embedding 缓存（Redis）、Prompt 压缩（去重+截断）、Latency 埋点（6 阶段计时）、检索可视化（SSE `retrieved` 事件） |
 | **RAG_OPTIMIZATION.md** | **2026-05 新增**：RAG 模块四项优化详解——Embedding 缓存、Prompt 压缩、Latency 埋点、检索可视化的设计决策、实现要点与预期收益 |
 | **RAG_PHASED_OPTIMIZATION.md** | **2026-06 新增**：RAG 后续分阶段优化计划——阶段 1 摄入、阶段 2 召回/过滤/重排、阶段 3 缓存/隔离/限流/降级、阶段 4 观测/评测/发布；含 DoD、表结构建议、API、Sprint 路线图；**§9 会话接续 checklist** |
+| **TRAVEL_PLANNER_AGENT.md** | **2026-06 新增**：情侣行程规划 Agent 分阶段计划——P0 契约、P1 天气+高德数据增强、P2 Agent 工具循环、P3 POI 向量+前端+共同计划；含任务 ID 表、DTO/API、验收用例、风险、附录 |
 
 ## 建议加载顺序（典型任务）
 
@@ -42,6 +44,7 @@
 5. **恋爱问答 / Milvus RAG**：`love-qa-rag.md` → 必要时 `PROJECT_STRUCTURE.md`（路径）与 `lovespace-user` 的 `application.yml`。
 6. **RAG 优化专项（缓存/压缩/埋点/可视化）**：`RAG_OPTIMIZATION.md`（已落地设计）→ `love-qa-rag.md`（接口与配置）→ `decisions.md`（架构决策）。
 7. **RAG 后续迭代 / Sprint 规划**：`RAG_PHASED_OPTIMIZATION.md`（分阶段任务拆解）→ `love-qa-rag.md`（现状）→ `progress.md`（进度）。
+8. **情侣行程规划 Agent**：`TRAVEL_PLANNER_AGENT.md`（P0–P3 计划与验收）→ `decisions.md` §旅游规划 → `lovespace-ai/.../travel/` 源码。
 
 ## 与 Cursor 的配合
 
