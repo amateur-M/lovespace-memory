@@ -47,6 +47,7 @@
 4. `JwtAuthenticationFilter`：对 WebSocket 路径前缀 `/ws/` 不执行 Bearer 解析（避免无头时 401 阻断握手）。启用分布式 Session 时：Bearer 解析失败（过期等）不立即 401，继续链以便使用 Session 已恢复的认证；`jti` 黑名单仍 401（显式登出）
 5. **私密消息 WebSocket**：连接 URL 携带 `?token=<JWT>`；连接后先发 `subscribe`（含 `coupleId`）再收发业务 JSON。分布式 Session 不替代 WS 的 query token，浏览器仍依赖登录返回的 JWT 存 localStorage 连接 WS
 6. **CORS**：`DistributedSessionCorsConfig` 仅在 `lovespace.session.distributed.enabled=true` 时注册 `CorsConfigurationSource`（`allowCredentials(true)` + localhost/127.0.0.1 originPattern），供前端跨域直连 API 时携带 Session Cookie；同源 Vite 代理通常不需要
+7. **后台 RBAC（2026-06）**：`users.role`：`0=USER`（注册默认）、`1=ADMIN`。JWT 新增 `role` claim；`JwtAuthenticationFilter` 设置 `ROLE_USER` / `ROLE_ADMIN`。`/api/v1/admin/**` 需 `hasRole("ADMIN")`；原 `/users` 管理接口已移除，迁入 `AdminUserController`。首个管理员：`lovespace.admin.bootstrap-phone`（库中尚无 ADMIN 时启动提升指定手机号用户）；或执行 `sql/users_add_role.sql` 后手动 `UPDATE users SET role=1 WHERE phone=...`。注册与资料接口不可修改 `role`
 
 ## 前端全局样式与登录态
 

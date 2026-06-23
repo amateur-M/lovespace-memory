@@ -27,6 +27,7 @@
 - **情侣邀请与「消息」**：GET/POST /api/v1/couple/pending-invites、GET .../pending-invites/count；被邀请方在 /inbox 列表一键接受，无需手输绑定码；AppLayout 下拉消息列表 + inboxStore 角标；CoupleHome 以「查看消息」为主流程
 - **容器部署**：根目录 docker-compose.yml（**milvus-etcd**、**milvus**、MySQL / Redis、与 Milvus **共用**业务 **MinIO**、backend / frontend）、双 Dockerfile、env.example、前端 nginx.conf 反代 /api、/local-files、/ws；后端环境变量含 `**MILVUS_HOST`**、`**SPRING_AI_DASHSCOPE_API_KEY**`、`**SPRING_AI_VECTORSTORE_MILVUS_INITIALIZE_SCHEMA**`、`**LOVESPACE_MILVUS_ENSURE_LOVE_KNOWLEDGE_SCHEMA**` 等；说明见 DEPLOYMENT.md
 - **Maven 可执行包**：父 POM pluginManagement 为 spring-boot-maven-plugin 指定 ${spring-boot.version}；lovespace-user 显式 repackage 与 mainClass，避免 fat jar 无 Main-Class
+- **后台管理系统（2026-06）**：`users.role`（0 USER / 1 ADMIN）+ JWT `role` claim + `/api/v1/admin/**`（`Admin*Controller` / `Admin*Service`）；前端同应用 `/admin/*`（`AdminLayout`、`AdminRoute`、各管理页）；首个管理员见 `lovespace.admin.bootstrap-phone` 或 `sql/users_add_role.sql`；原 `/users` 越权接口已删除
 - **MinIO 访问 URL**：lovespace.minio.public-base-url 若配置，MinioAvatarStorageService 返回 {publicBaseUrl}/{bucket}/{objectKey}；未配置时用 http://{endpoint主机}/{bucket}/{objectKey}，生产应对外填写 LOVESPACE_MINIO_PUBLIC_BASE_URL；浏览器直链对象需桶匿名读策略，否则 403
 
 ---
